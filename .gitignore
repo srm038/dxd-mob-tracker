@@ -1,0 +1,15 @@
+# Virtual environment
+.venv/
+
+# Byte-code files
+__pycache__/
+*.pyc
+
+# Editor swap files
+*.swp
+
+# Log files
+*.log
+
+# IDE files
+.vscode/
