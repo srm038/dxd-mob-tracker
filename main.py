@@ -1,6 +1,7 @@
 import shlex
 from dataclasses import dataclass, field
 from textual.app import App, ComposeResult
+from textual import events
 from textual.widgets import Header, Footer, RichLog, Input
 
 @dataclass
@@ -29,6 +30,8 @@ class MobTrackerApp(App):
             "help": self._command_help,
             "exit": self.exit,
         }
+        self.command_history = []
+        self.history_index = 0
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -56,8 +59,14 @@ class MobTrackerApp(App):
         """Called when the user submits a command."""
         command_log = self.query_one("#display")
         should_refresh = True
+        
+        command_text = event.value
+        if command_text:
+            self.command_history.append(command_text)
+            self.history_index = len(self.command_history)
+
         try:
-            parts = shlex.split(event.value)
+            parts = shlex.split(command_text)
             if not parts:
                 return
 
@@ -79,11 +88,31 @@ class MobTrackerApp(App):
         if should_refresh:
             self._refresh_display()
 
+    async def on_key(self, event: events.Key) -> None:
+        """Called when a key is pressed."""
+        input_widget = self.query_one(Input)
+        if not input_widget.has_focus:
+            return
+
+        if event.key == "up":
+            if self.command_history:
+                self.history_index = max(0, self.history_index - 1)
+                input_widget.value = self.command_history[self.history_index]
+            event.prevent_default()
+        elif event.key == "down":
+            if self.command_history:
+                self.history_index = min(len(self.command_history), self.history_index + 1)
+                if self.history_index == len(self.command_history):
+                    input_widget.value = ""
+                else:
+                    input_widget.value = self.command_history[self.history_index]
+            event.prevent_default()
+
     def _command_add(self, name: str, hp: str) -> bool:
         """Adds a new mob, handling duplicate names."""
         name = name.title() # Title-case the name
         lower_name = name.lower()
-                
+        
         # Find all existing mobs with the same base name
         matching_mobs = [m for m in self.mobs if m.name.lower().split(" ")[0] == lower_name]
         
@@ -98,7 +127,6 @@ class MobTrackerApp(App):
 
         self.mobs.append(Mob(final_name, int(hp)))
         return True
-
     def _command_damage(self, index: str, amount: str) -> bool:
         """Applies damage to a mob."""
         mob_index = int(index) - 1
