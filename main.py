@@ -11,6 +11,7 @@ class Mob:
     max_hp: int
     hp: int = field(init=False)
     status: str = "Alive"
+    stunned: bool = False
 
     def __post_init__(self):
         self.hp = self.max_hp
@@ -28,6 +29,7 @@ class MobTrackerApp(App):
         self.commands = {
             "add": self._command_add,
             "damage": self._command_damage,
+            "unstun": self._command_unstun,
             "help": self._command_help,
             "exit": self.exit,
         }
@@ -54,7 +56,8 @@ class MobTrackerApp(App):
         lines = []
         for i, mob in enumerate(self.mobs):
             status_icon = "[✓]" if mob.status == "Alive" else "[X]"
-            lines.append(f"[{i+1}] {status_icon} {mob.name} ({mob.hp}/{mob.max_hp} HP)")
+            stun_indicator = " ⚡" if mob.stunned else ""
+            lines.append(f"[{i+1}] {status_icon} {mob.name}{stun_indicator} ({mob.hp}/{mob.max_hp} HP)")
         log.write("\n".join(lines))
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -152,10 +155,33 @@ class MobTrackerApp(App):
             log.write("Error: Invalid mob index or damage amount.")
             return False  # Don't refresh on error
 
+        # Check if damage is 25% or more of current HP before applying damage
+        # OR if mob's HP is already below 0, every hit causes stun
+        if (mob.hp > 0 and damage >= mob.hp * 0.25) or mob.hp < 0:
+            mob.stunned = True
+            log.write(f"{mob.name} has been stunned!")
+
         mob.hp -= damage
         if mob.hp <= 0:
-            mob.hp = 0
             mob.status = "Defeated"
+        return True
+
+    def _command_unstun(self, index: str) -> bool:
+        """Removes the stunned status from a mob."""
+        log = self.query_one("#display", RichLog)
+
+        try:
+            mob_index = int(index) - 1
+            mob = self.mobs[mob_index]
+        except (ValueError, IndexError):
+            log.write("Error: Invalid mob index.")
+            return False  # Don't refresh on error
+
+        if mob.stunned:
+            mob.stunned = False
+            log.write(f"{mob.name} has been unstunned!")
+        else:
+            log.write(f"{mob.name} is not stunned.")
         return True
 
     def _command_help(self) -> bool:
@@ -164,6 +190,7 @@ class MobTrackerApp(App):
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation, e.g., 2d8+2, 4d6L>\n"
                   "- damage <index> <amount>\n"
+                  "- unstun <index>\n"
                   "- help\n"
                   "- exit")
         return False
