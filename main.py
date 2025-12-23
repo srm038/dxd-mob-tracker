@@ -1,4 +1,5 @@
 import shlex
+import dice
 from dataclasses import dataclass, field
 from textual.app import App, ComposeResult
 from textual import events
@@ -49,6 +50,7 @@ class MobTrackerApp(App):
         """Refreshes the main display with the current mob list."""
         log = self.query_one("#display", RichLog)
         log.clear()
+
         lines = []
         for i, mob in enumerate(self.mobs):
             status_icon = "[✓]" if mob.status == "Alive" else "[X]"
@@ -108,30 +110,49 @@ class MobTrackerApp(App):
                     input_widget.value = self.command_history[self.history_index]
             event.prevent_default()
 
-    def _command_add(self, name: str, hp: str) -> bool:
-        """Adds a new mob, handling duplicate names."""
-        name = name.title() # Title-case the name
+    def _roll_dice(self, die_string: str) -> int:
+        """Rolls dice based on a die string like '2d6+2' using the dice library."""
+        return int(dice.roll(die_string))
+
+    def _command_add(self, name: str, hp_str: str) -> bool:
+        """Adds a new mob, handling duplicate names and dice notation."""
+        name = name.title()
         lower_name = name.lower()
-        
-        # Find all existing mobs with the same base name
+
+        log = self.query_one("#display", RichLog)
+
+        try:
+            hp = self._roll_dice(hp_str)
+            log.write(f"Rolled {hp_str} for {name}: {hp} HP")
+        except Exception as e:
+            log.write(f"Error: Invalid HP format or dice string: {hp_str} ({e})")
+            return False  # Don't refresh on error
+
         matching_mobs = [m for m in self.mobs if m.name.lower().split(" ")[0] == lower_name]
-        
+
         final_name = name
         if matching_mobs:
-            # If this is the second mob of its kind, rename the first one
             if len(matching_mobs) == 1 and " " not in matching_mobs[0].name:
                 matching_mobs[0].name = f"{matching_mobs[0].name} 1"
-            
-            # The new mob gets the next number
+
             final_name = f"{name} {len(matching_mobs) + 1}"
 
-        self.mobs.append(Mob(final_name, int(hp)))
+        self.mobs.append(Mob(final_name, hp))
         return True
+
     def _command_damage(self, index: str, amount: str) -> bool:
         """Applies damage to a mob."""
-        mob_index = int(index) - 1
-        mob = self.mobs[mob_index]
-        mob.hp -= int(amount)
+        log = self.query_one("#display", RichLog)
+
+        try:
+            mob_index = int(index) - 1
+            mob = self.mobs[mob_index]
+            damage = int(amount)
+        except (ValueError, IndexError):
+            log.write("Error: Invalid mob index or damage amount.")
+            return False  # Don't refresh on error
+
+        mob.hp -= damage
         if mob.hp <= 0:
             mob.hp = 0
             mob.status = "Defeated"
@@ -139,9 +160,9 @@ class MobTrackerApp(App):
 
     def _command_help(self) -> bool:
         """Displays help information."""
-        log = self.query_one("#display", RichLog)
+        log = self.query_one("#display")
         log.write("\nAvailable commands:\n"
-                  "- add <name> <hp>\n"
+                  "- add <name> <hp or dice notation, e.g., 2d8+2, 4d6L>\n"
                   "- damage <index> <amount>\n"
                   "- help\n"
                   "- exit")
