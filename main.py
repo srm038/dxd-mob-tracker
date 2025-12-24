@@ -59,6 +59,8 @@ class MobTrackerApp(App):
             "set": self._command_set,
             "combat": self._command_combat,
             "reset": self._command_reset,
+            "remove": self._command_remove,
+            "clear": self._command_clear,
             "help": self._command_help,
             "exit": self.exit,
         }
@@ -507,6 +509,31 @@ class MobTrackerApp(App):
         log.write(f"{attacker.name} hits {target.name} for {damage} damage!")
         return True
 
+    def _command_remove(self, index: str) -> bool:
+        """Removes a PC or mob by index."""
+        log = self.query_one("#command-output", RichLog)
+
+        try:
+            entity_index = int(index) - 1
+        except ValueError:
+            log.write("Error: Invalid entity index.")
+            return False
+
+        if entity_index < len(self.pcs):
+            # Removing a PC
+            removed_pc = self.pcs.pop(entity_index)
+            log.write(f"Removed PC: {removed_pc.name}")
+        elif entity_index < len(self.pcs) + len(self.mobs):
+            # Removing a mob
+            mob_index = entity_index - len(self.pcs)
+            removed_mob = self.mobs.pop(mob_index)
+            log.write(f"Removed Mob: {removed_mob.name}")
+        else:
+            log.write("Error: Invalid entity index.")
+            return False
+
+        return True
+
     def _command_reset(self) -> bool:
         """Resets the damage tracking for all PCs to start a new combat."""
         log = self.query_one("#command-output", RichLog)
@@ -517,6 +544,32 @@ class MobTrackerApp(App):
             pc.damage_taken = 0
 
         log.write("All PC damage statistics have been reset for a new combat!")
+        return True
+
+    def _command_clear(self, target: str = "") -> bool:
+        """Clears PCs, mobs, or both lists."""
+        log = self.query_one("#command-output", RichLog)
+
+        target_lower = target.lower() if target else ""
+
+        if target_lower == "pcs":
+            count = len(self.pcs)
+            self.pcs.clear()
+            log.write(f"Cleared all {count} PCs.")
+        elif target_lower == "mobs":
+            count = len(self.mobs)
+            self.mobs.clear()
+            log.write(f"Cleared all {count} Mobs.")
+        elif target_lower == "all":
+            pc_count = len(self.pcs)
+            mob_count = len(self.mobs)
+            self.pcs.clear()
+            self.mobs.clear()
+            log.write(f"Cleared all {pc_count} PCs and {mob_count} Mobs.")
+        else:
+            log.write("Error: Invalid target. Use 'pcs', 'mobs', or 'all'.")
+            return False
+
         return True
 
     def _command_unstun(self, index: str) -> bool:
@@ -554,6 +607,8 @@ class MobTrackerApp(App):
                   "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
                   "- combat <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
                   "- damage <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
+                  "- remove <index> (remove entity by index)\n"
+                  "- clear [pcs|mobs|all] (clear all entities of specified type)\n"
                   "- reset (reset all PC damage statistics for a new combat)\n"
                   "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
@@ -585,6 +640,8 @@ class MobTrackerApp(App):
                   "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
                   "- combat <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
                   "- damage <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
+                  "- remove <index> (remove entity by index)\n"
+                  "- clear [pcs|mobs|all] (clear all entities of specified type)\n"
                   "- reset (reset all PC damage statistics for a new combat)\n"
                   "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
