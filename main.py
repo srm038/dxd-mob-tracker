@@ -15,6 +15,7 @@ class Mob:
     stunned: bool = False
     morale: int = 7  # Default morale rating (7 for clan fighters, etc.)
     morale_status: str = "Normal"  # Normal, Panicked, Routed
+    min_hp: int = 0  # Minimum HP before mob is killed (can be negative for certain mobs)
 
     def __post_init__(self):
         self.hp = self.max_hp
@@ -37,6 +38,7 @@ class MobTrackerApp(App):
             "panic": self._command_panic,
             "rally": self._command_rally,
             "unstun": self._command_unstun,
+            "set": self._command_set,
             "help": self._command_help,
             "exit": self.exit,
         }
@@ -82,7 +84,10 @@ class MobTrackerApp(App):
             elif mob.morale_status == "Routed":
                 morale_indicator = " 🏃"
 
-            lines.append(f"[{i+1}] {status_icon} {mob.name}{stun_indicator}{morale_indicator} ({mob.hp}/{mob.max_hp} HP) [Morale: {mob.morale}]")
+            # Show min_hp if it's not the default value
+            min_hp_indicator = f" [MinHP: {mob.min_hp}]" if mob.min_hp != 0 else ""
+
+            lines.append(f"[{i+1}] {status_icon} {mob.name}{stun_indicator}{morale_indicator} ({mob.hp}/{mob.max_hp} HP) [Morale: {mob.morale}]{min_hp_indicator}")
 
         mob_list.update("\n".join(lines))
 
@@ -196,7 +201,7 @@ class MobTrackerApp(App):
             log.write(f"{mob.name} has been stunned!")
 
         mob.hp -= damage
-        if mob.hp <= 0:
+        if mob.hp <= mob.min_hp:
             mob.status = "Defeated"
         return True
 
@@ -292,6 +297,39 @@ class MobTrackerApp(App):
 
         return True
 
+    def _command_set(self, property_name: str, index: str, value: str) -> bool:
+        """Sets a property of a mob directly."""
+        log = self.query_one("#command-output", RichLog)
+
+        try:
+            mob_index = int(index) - 1
+            mob = self.mobs[mob_index]
+        except (ValueError, IndexError):
+            log.write("Error: Invalid mob index.")
+            return False  # Don't refresh on error
+
+        try:
+            if property_name.lower() == "morale":
+                new_value = int(value)
+                # Ensure morale is within valid range (2-12)
+                new_value = max(2, min(12, new_value))
+                old_value = mob.morale
+                mob.morale = new_value
+                log.write(f"{mob.name}'s morale changed from {old_value} to {new_value}.")
+            elif property_name.lower() == "min_hp":
+                new_value = int(value)
+                old_value = mob.min_hp
+                mob.min_hp = new_value
+                log.write(f"{mob.name}'s minimum HP changed from {old_value} to {new_value}.")
+            else:
+                log.write(f"Error: Unknown property '{property_name}'. Supported properties: morale, min_hp")
+                return False
+        except ValueError:
+            log.write(f"Error: Invalid value '{value}' for property '{property_name}'.")
+            return False
+
+        return True
+
     def _command_unstun(self, index: str) -> bool:
         """Removes the stunned status from a mob."""
         log = self.query_one("#command-output", RichLog)
@@ -320,6 +358,7 @@ class MobTrackerApp(App):
                   "- boldness <index> (check when taking damage)\n"
                   "- panic <index> (check when allies are killed)\n"
                   "- rally <index> (attempt to recover from panic/route)\n"
+                  "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5)\n"
                   "- unstun <index>\n"
                   "- help\n"
                   "- exit")
@@ -350,6 +389,7 @@ class MobTrackerApp(App):
                   "- boldness <index> (check when taking damage)\n"
                   "- panic <index> (check when allies are killed)\n"
                   "- rally <index> (attempt to recover from panic/route)\n"
+                  "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5)\n"
                   "- unstun <index>\n"
                   "- help\n"
                   "- exit\n\n"
