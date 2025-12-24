@@ -258,7 +258,7 @@ class MobTrackerApp(App):
                 morale = 9
 
             self.pcs.append(PC(final_name, hp, morale=morale))
-            log.write(f"Added PC: {final_name}")
+            log.write(f"Added PC: {final_name} with {hp} HP, morale {morale}")
         else:  # Default to mob
             # Check for matching mobs for duplicate handling
             matching_entities = [m for m in self.mobs if m.name.lower().split(" ")[0] == lower_name]
@@ -271,7 +271,7 @@ class MobTrackerApp(App):
                 final_name = f"{name} {len(matching_entities) + 1}"
 
             self.mobs.append(Mob(final_name, hp, morale=morale))
-            log.write(f"Added Mob: {final_name}")
+            log.write(f"Added Mob: {final_name} with {hp} HP, morale {morale}")
 
         return True
 
@@ -338,45 +338,45 @@ class MobTrackerApp(App):
         if check_type_lower == "braveness":
             roll = self._roll_2d6()
             if roll >= entity.morale:
-                log.write(f"{entity.name} passes braveness check (rolled {roll} vs {entity.morale} morale) - ready for melee!")
+                log.write(f"{entity.name} passes braveness check: {roll} vs {entity.morale} morale.")
             else:
-                log.write(f"{entity.name} fails braveness check (rolled {roll} vs {entity.morale} morale) - won't engage in melee!")
+                log.write(f"{entity.name} fails braveness check: {roll} vs {entity.morale} morale.")
                 # On failure, the entity might become panicked or routed depending on interpretation
                 entity.morale_status = "Panicked"
-                log.write(f"{entity.name} is now panicked!")
+                log.write(f"{entity.name} is panicked.")
         elif check_type_lower == "boldness":
             roll = self._roll_2d6()
             if roll >= entity.morale:
-                log.write(f"{entity.name} passes boldness check (rolled {roll} vs {entity.morale} morale) - continues fighting!")
+                log.write(f"{entity.name} passes boldness check: {roll} vs {entity.morale} morale.")
                 # Success: gain +1 permanent morale
                 entity.morale = min(12, entity.morale + 1)  # Cap at 12
-                log.write(f"{entity.name}'s morale increases to {entity.morale}!")
+                log.write(f"{entity.name} morale increases to {entity.morale}.")
             else:
-                log.write(f"{entity.name} fails boldness check (rolled {roll} vs {entity.morale} morale) - falls back/routs!")
+                log.write(f"{entity.name} fails boldness check: {roll} vs {entity.morale} morale.")
                 # Failure: become panicked or routed
                 entity.morale_status = "Routed"
-                log.write(f"{entity.name} is now routed!")
+                log.write(f"{entity.name} is routed.")
         elif check_type_lower == "panic":
             # Panic checks have a +2 bonus according to the wiki
             roll = self._roll_2d6()
             modified_roll = roll + 2
             if modified_roll >= entity.morale:
-                log.write(f"{entity.name} passes panic check (rolled {roll}+2={modified_roll} vs {entity.morale} morale) - holds position!")
+                log.write(f"{entity.name} passes panic check: {roll}+2={modified_roll} vs {entity.morale} morale.")
             else:
-                log.write(f"{entity.name} fails panic check (rolled {roll}+2={modified_roll} vs {entity.morale} morale) - panics!")
+                log.write(f"{entity.name} fails panic check: {roll}+2={modified_roll} vs {entity.morale} morale.")
                 entity.morale_status = "Panicked"
-                log.write(f"{entity.name} is now panicked!")
+                log.write(f"{entity.name} is panicked.")
         elif check_type_lower == "rally":
             if entity.morale_status == "Normal":
-                log.write(f"{entity.name} is already normal and doesn't need to rally.")
+                log.write(f"{entity.name} is already normal.")
                 return True
 
             roll = self._roll_2d6()
             if roll >= entity.morale:
-                log.write(f"{entity.name} successfully rallies (rolled {roll} vs {entity.morale} morale) - returns to normal!")
+                log.write(f"{entity.name} rallies: {roll} vs {entity.morale} morale.")
                 entity.morale_status = "Normal"
             else:
-                log.write(f"{entity.name} fails to rally (rolled {roll} vs {entity.morale} morale) - remains {entity.morale_status.lower()}.")
+                log.write(f"{entity.name} fails rally: {roll} vs {entity.morale} morale. Status remains {entity.morale_status.lower()}.")
         else:
             log.write(f"Error: Unknown check type '{check_type}'. Supported checks: braveness, boldness, panic, rally")
             return False
@@ -415,7 +415,7 @@ class MobTrackerApp(App):
                 new_value = max(2, min(12, new_value))
                 old_value = entity.morale
                 entity.morale = new_value
-                log.write(f"{entity.name}'s morale changed from {old_value} to {new_value}.")
+                log.write(f"{entity.name} morale changed from {old_value} to {new_value}.")
             except ValueError:
                 log.write(f"Error: Invalid value '{value}' for property '{property_name}'.")
                 return False
@@ -424,17 +424,17 @@ class MobTrackerApp(App):
                 new_value = int(value)
                 old_value = entity.min_hp
                 entity.min_hp = new_value
-                log.write(f"{entity.name}'s minimum HP changed from {old_value} to {new_value}.")
+                log.write(f"{entity.name} minimum HP changed from {old_value} to {new_value}.")
             except ValueError:
                 log.write(f"Error: Invalid value '{value}' for property '{property_name}'.")
                 return False
         elif property_name.lower() == "stunned":
             if value.lower() in ["true", "yes", "1", "on"]:
                 entity.stunned = True
-                log.write(f"{entity.name} is now stunned.")
+                log.write(f"{entity.name} is stunned.")
             elif value.lower() in ["false", "no", "0", "off"]:
                 entity.stunned = False
-                log.write(f"{entity.name} is no longer stunned.")
+                log.write(f"{entity.name} is not stunned.")
             else:
                 log.write(f"Error: Invalid value '{value}' for stunned property. Use true/false, yes/no, 1/0, or on/off.")
                 return False
@@ -442,7 +442,7 @@ class MobTrackerApp(App):
             valid_statuses = ["normal", "panicked", "routed"]
             if value.lower() in valid_statuses:
                 entity.morale_status = value.lower().capitalize()
-                log.write(f"{entity.name}'s morale status changed to {entity.morale_status}.")
+                log.write(f"{entity.name} morale status changed to {entity.morale_status}.")
             else:
                 log.write(f"Error: Invalid value '{value}' for morale_status property. Use: {', '.join(valid_statuses)}")
                 return False
@@ -450,7 +450,7 @@ class MobTrackerApp(App):
             valid_statuses = ["alive", "defeated"]
             if value.lower() in valid_statuses:
                 entity.status = value.lower().capitalize()
-                log.write(f"{entity.name}'s status changed to {entity.status}.")
+                log.write(f"{entity.name} status changed to {entity.status}.")
             else:
                 log.write(f"Error: Invalid value '{value}' for status property. Use: {', '.join(valid_statuses)}")
                 return False
@@ -466,7 +466,7 @@ class MobTrackerApp(App):
         # OR if target's HP is already below 0, every hit causes stun
         if (target.hp > 0 and damage >= target.hp * 0.25) or target.hp < 0:
             target.stunned = True
-            log.write(f"{target_name} has been stunned!")
+            log.write(f"{target_name} is stunned.")
 
         # Apply damage to target
         target.hp -= damage
@@ -544,7 +544,7 @@ class MobTrackerApp(App):
         if target_type == "PC":
             target.damage_taken += damage
 
-        log.write(f"{attacker.name} hits {target.name} for {damage} damage!")
+        log.write(f"{attacker.name} deals {damage} damage to {target.name}.")
 
         # Recalculate XP for all PCs
         self._recalculate_xp()
@@ -585,7 +585,7 @@ class MobTrackerApp(App):
             pc.damage_dealt = 0
             pc.damage_taken = 0
 
-        log.write("All PC damage statistics have been reset for a new combat!")
+        log.write("PC damage statistics reset for new combat.")
 
         # Recalculate XP for all PCs
         self._recalculate_xp()
@@ -602,7 +602,7 @@ class MobTrackerApp(App):
             # Recalculate XP for all PCs
             self._recalculate_xp()
 
-            log.write("XP calculated for all PCs based on combat actions!")
+            log.write("XP calculated for all PCs based on combat actions.")
             self._show_xp_breakdown()
         elif action_lower == "show":
             self._show_xp_breakdown()
@@ -638,17 +638,17 @@ class MobTrackerApp(App):
         if target_lower == "pcs":
             count = len(self.pcs)
             self.pcs.clear()
-            log.write(f"Cleared all {count} PCs.")
+            log.write(f"Cleared {count} PCs.")
         elif target_lower == "mobs":
             count = len(self.mobs)
             self.mobs.clear()
-            log.write(f"Cleared all {count} Mobs.")
+            log.write(f"Cleared {count} Mobs.")
         elif target_lower == "all":
             pc_count = len(self.pcs)
             mob_count = len(self.mobs)
             self.pcs.clear()
             self.mobs.clear()
-            log.write(f"Cleared all {pc_count} PCs and {mob_count} Mobs.")
+            log.write(f"Cleared {pc_count} PCs and {mob_count} Mobs.")
         else:
             log.write("Error: Invalid target. Use 'pcs', 'mobs', or 'all'.")
             return False
@@ -678,7 +678,7 @@ class MobTrackerApp(App):
 
         if entity.stunned:
             entity.stunned = False
-            log.write(f"{entity.name} has been unstunned!")
+            log.write(f"{entity.name} is no longer stunned.")
         else:
             log.write(f"{entity.name} is not stunned.")
         return True
