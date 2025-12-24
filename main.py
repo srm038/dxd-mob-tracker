@@ -656,7 +656,7 @@ Horizontal {
 .pc-list-panel {
     height: 1fr;
     width: 1fr;
-    border: solid $secondary;
+    border: none;
     background: $surface;
     padding: 1;
     content-align: left top;
@@ -665,7 +665,7 @@ Horizontal {
 .mob-list-panel {
     height: 1fr;
     width: 1fr;
-    border: solid $primary;
+    border: none;
     background: $surface;
     padding: 1;
     content-align: left top;
@@ -674,28 +674,20 @@ Horizontal {
 .log-panel {
     height: 1fr;
     width: 1fr;
-    border: solid $success;
+    border: none;
     background: $surface;
-    padding: 1;
+    padding: 0;
     content-align: left top;
 }
 
-.log-panel {
-    height: 1fr;
-    width: 1fr;
-    border: solid $success;
-    background: $surface;
-    padding: 1;
-    content-align: left top;
-}
 
 #command-input {
     height: 1;
     margin: 1 0 0 0;
-    border: solid $warning;
+    border: none;
     background: $surface;
     color: $text;
-    padding: 0 1;
+    padding-left: 3;  /* Make space for the > prompt */
 }
 
 Header {
@@ -718,6 +710,7 @@ Static {
 RichLog {
     border: none;
     background: $surface;
+    content-align: left top;
 }
 """
 
