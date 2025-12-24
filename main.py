@@ -34,7 +34,6 @@ class MobTrackerApp(App):
             "add": self._command_add,
             "damage": self._command_damage,
             "check": self._command_check,
-            "rally": self._command_rally,
             "unstun": self._command_unstun,
             "set": self._command_set,
             "help": self._command_help,
@@ -247,8 +246,19 @@ class MobTrackerApp(App):
                 log.write(f"{mob.name} fails panic check (rolled {roll}+2={modified_roll} vs {mob.morale} morale) - panics!")
                 mob.morale_status = "Panicked"
                 log.write(f"{mob.name} is now panicked!")
+        elif check_type_lower == "rally":
+            if mob.morale_status == "Normal":
+                log.write(f"{mob.name} is already normal and doesn't need to rally.")
+                return True
+
+            roll = self._roll_2d6()
+            if roll >= mob.morale:
+                log.write(f"{mob.name} successfully rallies (rolled {roll} vs {mob.morale} morale) - returns to normal!")
+                mob.morale_status = "Normal"
+            else:
+                log.write(f"{mob.name} fails to rally (rolled {roll} vs {mob.morale} morale) - remains {mob.morale_status.lower()}.")
         else:
-            log.write(f"Error: Unknown check type '{check_type}'. Supported checks: braveness, boldness, panic")
+            log.write(f"Error: Unknown check type '{check_type}'. Supported checks: braveness, boldness, panic, rally")
             return False
 
         return True
@@ -256,29 +266,6 @@ class MobTrackerApp(App):
 
 
 
-    def _command_rally(self, index: str) -> bool:
-        """Allows a panicked or routed mob to attempt to rally."""
-        log = self.query_one("#command-output", RichLog)
-
-        try:
-            mob_index = int(index) - 1
-            mob = self.mobs[mob_index]
-        except (ValueError, IndexError):
-            log.write("Error: Invalid mob index.")
-            return False  # Don't refresh on error
-
-        if mob.morale_status == "Normal":
-            log.write(f"{mob.name} is already normal and doesn't need to rally.")
-            return True
-
-        roll = self._roll_2d6()
-        if roll >= mob.morale:
-            log.write(f"{mob.name} successfully rallies (rolled {roll} vs {mob.morale} morale) - returns to normal!")
-            mob.morale_status = "Normal"
-        else:
-            log.write(f"{mob.name} fails to rally (rolled {roll} vs {mob.morale} morale) - remains {mob.morale_status.lower()}.")
-
-        return True
 
     def _command_set(self, property_name: str, index: str, value: str) -> bool:
         """Sets a property of a mob directly."""
@@ -367,8 +354,7 @@ class MobTrackerApp(App):
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [morale]\n"
                   "- damage <index> <amount>\n"
-                  "- check <type> <index> (perform morale checks: braveness, boldness, panic, e.g., check braveness 1)\n"
-                  "- rally <index> (attempt to recover from panic/route)\n"
+                  "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
                   "- help\n"
@@ -396,8 +382,7 @@ class MobTrackerApp(App):
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [morale]\n"
                   "- damage <index> <amount>\n"
-                  "- check <type> <index> (perform morale checks: braveness, boldness, panic, e.g., check braveness 1)\n"
-                  "- rally <index> (attempt to recover from panic/route)\n"
+                  "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
                   "- help\n"
