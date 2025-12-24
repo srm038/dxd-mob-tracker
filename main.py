@@ -33,9 +33,7 @@ class MobTrackerApp(App):
         self.commands = {
             "add": self._command_add,
             "damage": self._command_damage,
-            "braveness": self._command_braveness,
-            "boldness": self._command_boldness,
-            "panic": self._command_panic,
+            "check": self._command_check,
             "rally": self._command_rally,
             "unstun": self._command_unstun,
             "set": self._command_set,
@@ -205,8 +203,8 @@ class MobTrackerApp(App):
             mob.status = "Defeated"
         return True
 
-    def _command_braveness(self, index: str) -> bool:
-        """Performs a braveness check for a mob to enter melee combat."""
+    def _command_check(self, check_type: str, index: str) -> bool:
+        """Performs a morale check for a mob."""
         log = self.query_one("#command-output", RichLog)
 
         try:
@@ -216,62 +214,47 @@ class MobTrackerApp(App):
             log.write("Error: Invalid mob index.")
             return False  # Don't refresh on error
 
-        roll = self._roll_2d6()
-        if roll >= mob.morale:
-            log.write(f"{mob.name} passes braveness check (rolled {roll} vs {mob.morale} morale) - ready for melee!")
+        check_type_lower = check_type.lower()
+
+        if check_type_lower == "braveness":
+            roll = self._roll_2d6()
+            if roll >= mob.morale:
+                log.write(f"{mob.name} passes braveness check (rolled {roll} vs {mob.morale} morale) - ready for melee!")
+            else:
+                log.write(f"{mob.name} fails braveness check (rolled {roll} vs {mob.morale} morale) - won't engage in melee!")
+                # On failure, the mob might become panicked or routed depending on interpretation
+                mob.morale_status = "Panicked"
+                log.write(f"{mob.name} is now panicked!")
+        elif check_type_lower == "boldness":
+            roll = self._roll_2d6()
+            if roll >= mob.morale:
+                log.write(f"{mob.name} passes boldness check (rolled {roll} vs {mob.morale} morale) - continues fighting!")
+                # Success: gain +1 permanent morale
+                mob.morale = min(12, mob.morale + 1)  # Cap at 12
+                log.write(f"{mob.name}'s morale increases to {mob.morale}!")
+            else:
+                log.write(f"{mob.name} fails boldness check (rolled {roll} vs {mob.morale} morale) - falls back/routs!")
+                # Failure: become panicked or routed
+                mob.morale_status = "Routed"
+                log.write(f"{mob.name} is now routed!")
+        elif check_type_lower == "panic":
+            # Panic checks have a +2 bonus according to the wiki
+            roll = self._roll_2d6()
+            modified_roll = roll + 2
+            if modified_roll >= mob.morale:
+                log.write(f"{mob.name} passes panic check (rolled {roll}+2={modified_roll} vs {mob.morale} morale) - holds position!")
+            else:
+                log.write(f"{mob.name} fails panic check (rolled {roll}+2={modified_roll} vs {mob.morale} morale) - panics!")
+                mob.morale_status = "Panicked"
+                log.write(f"{mob.name} is now panicked!")
         else:
-            log.write(f"{mob.name} fails braveness check (rolled {roll} vs {mob.morale} morale) - won't engage in melee!")
-            # On failure, the mob might become panicked or routed depending on interpretation
-            mob.morale_status = "Panicked"
-            log.write(f"{mob.name} is now panicked!")
-
-    def _command_boldness(self, index: str) -> bool:
-        """Performs a boldness check when a mob takes damage."""
-        log = self.query_one("#command-output", RichLog)
-
-        try:
-            mob_index = int(index) - 1
-            mob = self.mobs[mob_index]
-        except (ValueError, IndexError):
-            log.write("Error: Invalid mob index.")
-            return False  # Don't refresh on error
-
-        roll = self._roll_2d6()
-        if roll >= mob.morale:
-            log.write(f"{mob.name} passes boldness check (rolled {roll} vs {mob.morale} morale) - continues fighting!")
-            # Success: gain +1 permanent morale
-            mob.morale = min(12, mob.morale + 1)  # Cap at 12
-            log.write(f"{mob.name}'s morale increases to {mob.morale}!")
-        else:
-            log.write(f"{mob.name} fails boldness check (rolled {roll} vs {mob.morale} morale) - falls back/routs!")
-            # Failure: become panicked or routed
-            mob.morale_status = "Routed"
-            log.write(f"{mob.name} is now routed!")
+            log.write(f"Error: Unknown check type '{check_type}'. Supported checks: braveness, boldness, panic")
+            return False
 
         return True
 
-    def _command_panic(self, index: str) -> bool:
-        """Forces a panic check for a mob when allies are killed nearby."""
-        log = self.query_one("#command-output", RichLog)
 
-        try:
-            mob_index = int(index) - 1
-            mob = self.mobs[mob_index]
-        except (ValueError, IndexError):
-            log.write("Error: Invalid mob index.")
-            return False  # Don't refresh on error
 
-        # Panic checks have a +2 bonus according to the wiki
-        roll = self._roll_2d6()
-        modified_roll = roll + 2
-        if modified_roll >= mob.morale:
-            log.write(f"{mob.name} passes panic check (rolled {roll}+2={modified_roll} vs {mob.morale} morale) - holds position!")
-        else:
-            log.write(f"{mob.name} fails panic check (rolled {roll}+2={modified_roll} vs {mob.morale} morale) - panics!")
-            mob.morale_status = "Panicked"
-            log.write(f"{mob.name} is now panicked!")
-
-        return True
 
     def _command_rally(self, index: str) -> bool:
         """Allows a panicked or routed mob to attempt to rally."""
@@ -384,9 +367,7 @@ class MobTrackerApp(App):
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [morale]\n"
                   "- damage <index> <amount>\n"
-                  "- braveness <index> (check to enter melee)\n"
-                  "- boldness <index> (check when taking damage)\n"
-                  "- panic <index> (check when allies are killed)\n"
+                  "- check <type> <index> (perform morale checks: braveness, boldness, panic, e.g., check braveness 1)\n"
                   "- rally <index> (attempt to recover from panic/route)\n"
                   "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
@@ -415,9 +396,7 @@ class MobTrackerApp(App):
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [morale]\n"
                   "- damage <index> <amount>\n"
-                  "- braveness <index> (check to enter melee)\n"
-                  "- boldness <index> (check when taking damage)\n"
-                  "- panic <index> (check when allies are killed)\n"
+                  "- check <type> <index> (perform morale checks: braveness, boldness, panic, e.g., check braveness 1)\n"
                   "- rally <index> (attempt to recover from panic/route)\n"
                   "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
