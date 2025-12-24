@@ -3,7 +3,8 @@ import dice
 from dataclasses import dataclass, field
 from textual.app import App, ComposeResult
 from textual import events
-from textual.widgets import Header, Footer, RichLog, Input
+from textual.widgets import Header, Footer, RichLog, Input, Static
+from textual.containers import Vertical, Horizontal
 
 @dataclass
 class Mob:
@@ -45,19 +46,29 @@ class MobTrackerApp(App):
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         yield Header()
-        yield RichLog(id="display", wrap=True)
-        yield Input(placeholder="Enter a command (type 'help' for options)")
+
+        # Main content area with mob list on left and log on right
+        with Horizontal():
+            # Left panel for mob list
+            with Vertical(id="left-panel", classes="panel"):
+                yield Static(id="mob-list", classes="mob-list-panel")
+
+            # Right panel for log output
+            with Vertical(id="right-panel", classes="panel"):
+                yield RichLog(id="command-output", wrap=True, classes="log-panel")
+
+        # Bottom input for commands
+        yield Input(placeholder="Enter a command (type 'help' for options)", id="command-input")
         yield Footer()
 
     def on_mount(self) -> None:
         """Called when the app is first mounted."""
-        self._refresh_display()
-        self.query_one(Input).focus()
+        self.key_bindings()
+        self.query_one("#command-input", Input).focus()
 
-    def _refresh_display(self) -> None:
-        """Refreshes the main display with the current mob list."""
-        log = self.query_one("#display", RichLog)
-        log.clear()
+    def _refresh_mob_list(self) -> None:
+        """Refreshes the mob list panel."""
+        mob_list = self.query_one("#mob-list", Static)
 
         lines = []
         for i, mob in enumerate(self.mobs):
@@ -72,13 +83,14 @@ class MobTrackerApp(App):
                 morale_indicator = " 🏃"
 
             lines.append(f"[{i+1}] {status_icon} {mob.name}{stun_indicator}{morale_indicator} ({mob.hp}/{mob.max_hp} HP) [Morale: {mob.morale}]")
-        log.write("\n".join(lines))
+
+        mob_list.update("\n".join(lines))
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Called when the user submits a command."""
-        command_log = self.query_one("#display")
+        command_log = self.query_one("#command-output", RichLog)
         should_refresh = True
-        
+
         command_text = event.value
         if command_text:
             self.command_history.append(command_text)
@@ -102,29 +114,23 @@ class MobTrackerApp(App):
         except Exception as e:
             command_log.write(f"\nError: {e}")
             should_refresh = False
-        
-        self.query_one(Input).value = ""
+
+        self.query_one("#command-input", Input).value = ""
         if should_refresh:
-            self._refresh_display()
+            self._refresh_mob_list()
 
     async def on_key(self, event: events.Key) -> None:
         """Called when a key is pressed."""
-        input_widget = self.query_one(Input)
+        input_widget = self.query_one("#command-input", Input)
         if not input_widget.has_focus:
             return
 
+        # Handle up/down arrow keys for command history
         if event.key == "up":
-            if self.command_history:
-                self.history_index = max(0, self.history_index - 1)
-                input_widget.value = self.command_history[self.history_index]
+            self.action_history_up()
             event.prevent_default()
         elif event.key == "down":
-            if self.command_history:
-                self.history_index = min(len(self.command_history), self.history_index + 1)
-                if self.history_index == len(self.command_history):
-                    input_widget.value = ""
-                else:
-                    input_widget.value = self.command_history[self.history_index]
+            self.action_history_down()
             event.prevent_default()
 
     def _roll_dice(self, die_string: str) -> int:
@@ -140,7 +146,7 @@ class MobTrackerApp(App):
         name = name.title()
         lower_name = name.lower()
 
-        log = self.query_one("#display", RichLog)
+        log = self.query_one("#command-output", RichLog)
 
         try:
             hp = self._roll_dice(hp_str)
@@ -173,7 +179,7 @@ class MobTrackerApp(App):
 
     def _command_damage(self, index: str, amount: str) -> bool:
         """Applies damage to a mob."""
-        log = self.query_one("#display", RichLog)
+        log = self.query_one("#command-output", RichLog)
 
         try:
             mob_index = int(index) - 1
@@ -196,7 +202,7 @@ class MobTrackerApp(App):
 
     def _command_braveness(self, index: str) -> bool:
         """Performs a braveness check for a mob to enter melee combat."""
-        log = self.query_one("#display", RichLog)
+        log = self.query_one("#command-output", RichLog)
 
         try:
             mob_index = int(index) - 1
@@ -216,7 +222,7 @@ class MobTrackerApp(App):
 
     def _command_boldness(self, index: str) -> bool:
         """Performs a boldness check when a mob takes damage."""
-        log = self.query_one("#display", RichLog)
+        log = self.query_one("#command-output", RichLog)
 
         try:
             mob_index = int(index) - 1
@@ -241,7 +247,7 @@ class MobTrackerApp(App):
 
     def _command_panic(self, index: str) -> bool:
         """Forces a panic check for a mob when allies are killed nearby."""
-        log = self.query_one("#display", RichLog)
+        log = self.query_one("#command-output", RichLog)
 
         try:
             mob_index = int(index) - 1
@@ -264,7 +270,7 @@ class MobTrackerApp(App):
 
     def _command_rally(self, index: str) -> bool:
         """Allows a panicked or routed mob to attempt to rally."""
-        log = self.query_one("#display", RichLog)
+        log = self.query_one("#command-output", RichLog)
 
         try:
             mob_index = int(index) - 1
@@ -288,7 +294,7 @@ class MobTrackerApp(App):
 
     def _command_unstun(self, index: str) -> bool:
         """Removes the stunned status from a mob."""
-        log = self.query_one("#display", RichLog)
+        log = self.query_one("#command-output", RichLog)
 
         try:
             mob_index = int(index) - 1
@@ -306,7 +312,7 @@ class MobTrackerApp(App):
 
     def _command_help(self) -> bool:
         """Displays help information."""
-        log = self.query_one("#display")
+        log = self.query_one("#command-output", RichLog)
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [morale]\n"
                   "- damage <index> <amount>\n"
@@ -322,6 +328,137 @@ class MobTrackerApp(App):
     def exit(self) -> None:
         """Exit the application."""
         super().exit()
+
+    def on_ready(self) -> None:
+        """Called when the app is ready to start."""
+        self._refresh_mob_list()
+
+    def key_bindings(self) -> None:
+        """Define key bindings for the app."""
+        self.bind("ctrl+h", "show_help", description="Show help")
+        self.bind("ctrl+q", "quit_app", description="Quit application")
+        self.bind("up", "history_up", description="Previous command")
+        self.bind("down", "history_down", description="Next command")
+
+    def action_show_help(self) -> None:
+        """Show help information."""
+        log = self.query_one("#command-output", RichLog)
+        log.write("\nAvailable commands:\n"
+                  "- add <name> <hp or dice notation> [morale]\n"
+                  "- damage <index> <amount>\n"
+                  "- braveness <index> (check to enter melee)\n"
+                  "- boldness <index> (check when taking damage)\n"
+                  "- panic <index> (check when allies are killed)\n"
+                  "- rally <index> (attempt to recover from panic/route)\n"
+                  "- unstun <index>\n"
+                  "- help\n"
+                  "- exit\n\n"
+                  "Key bindings:\n"
+                  "- Ctrl+H: Show help\n"
+                  "- Ctrl+Q: Quit application\n"
+                  "- Up/Down: Command history")
+        self._refresh_mob_list()
+
+    def action_quit_app(self) -> None:
+        """Quit the application."""
+        self.exit()
+
+    def action_history_up(self) -> None:
+        """Go up in command history."""
+        input_widget = self.query_one("#command-input", Input)
+        if self.command_history:
+            self.history_index = max(0, self.history_index - 1)
+            input_widget.value = self.command_history[self.history_index]
+
+    def action_history_down(self) -> None:
+        """Go down in command history."""
+        input_widget = self.query_one("#command-input", Input)
+        if self.command_history:
+            self.history_index = min(len(self.command_history), self.history_index + 1)
+            if self.history_index == len(self.command_history):
+                input_widget.value = ""
+            else:
+                input_widget.value = self.command_history[self.history_index]
+
+CSS = """
+Screen {
+    background: $surface;
+}
+
+Horizontal {
+    height: 1fr;
+}
+
+#left-panel {
+    width: 2fr;
+    height: 1fr;
+    border: solid $primary;
+    background: $panel;
+    padding: 0;
+    margin: 0;
+}
+
+#right-panel {
+    width: 1fr;
+    height: 1fr;
+    border: solid $success;
+    background: $panel;
+    padding: 0;
+    margin: 0;
+}
+
+.mob-list-panel {
+    height: 1fr;
+    width: 1fr;
+    border: solid $primary;
+    background: $surface;
+    padding: 1;
+    content-align: left top;
+}
+
+.log-panel {
+    height: 1fr;
+    width: 1fr;
+    border: solid $success;
+    background: $surface;
+    padding: 1;
+    content-align: left top;
+}
+
+#command-input {
+    height: 1;
+    margin: 1 0 0 0;
+    border: solid $warning;
+    background: $surface;
+    color: $text;
+    padding: 0 1;
+}
+
+Header {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+Footer {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+Static {
+    border: none;
+    background: $surface;
+}
+
+RichLog {
+    border: none;
+    background: $surface;
+}
+"""
+
+# Apply the CSS to the app
+MobTrackerApp.CSS = CSS
 
 if __name__ == "__main__":
     app = MobTrackerApp()
