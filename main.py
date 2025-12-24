@@ -367,6 +367,7 @@ class MobTrackerApp(App):
 
     def on_ready(self) -> None:
         """Called when the app is ready to start."""
+        self.title = "Higher Path Combat Tracker"
         self._refresh_mob_list()
 
     def key_bindings(self) -> None:
