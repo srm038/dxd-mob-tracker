@@ -20,6 +20,20 @@ class Mob:
     def __post_init__(self):
         self.hp = self.max_hp
 
+@dataclass
+class PC:
+    name: str
+    max_hp: int
+    hp: int = field(init=False)
+    status: str = "Alive"
+    stunned: bool = False
+    morale: int = 9  # Default morale for PCs
+    morale_status: str = "Normal"  # Normal, Panicked, Routed
+    min_hp: int = -10  # PCs can survive with negative HP up to -10
+
+    def __post_init__(self):
+        self.hp = self.max_hp
+
 class MobTrackerApp(App):
     """A command-driven mob tracker TUI."""
 
@@ -29,6 +43,11 @@ class MobTrackerApp(App):
             Mob("Goblin", 7),
             Mob("Orc", 15),
             Mob("Bugbear", 27),
+        ]
+        self.pcs = [
+            PC("Aldric", 25),
+            PC("Mira", 18),
+            PC("Thorin", 30),
         ]
         self.commands = {
             "add": self._command_add,
@@ -46,15 +65,19 @@ class MobTrackerApp(App):
         """Create child widgets for the app."""
         yield Header()
 
-        # Main content area with mob list on left and log on right
+        # Main content area with PC list on left and mob list on right
         with Horizontal():
-            # Left panel for mob list
-            with Vertical(id="left-panel", classes="panel"):
+            # Left panel for PC list
+            with Vertical(id="pc-panel", classes="panel"):
+                yield Static(id="pc-list", classes="pc-list-panel")
+
+            # Right panel for mob list
+            with Vertical(id="mob-panel", classes="panel"):
                 yield Static(id="mob-list", classes="mob-list-panel")
 
-            # Right panel for log output
-            with Vertical(id="right-panel", classes="panel"):
-                yield RichLog(id="command-output", wrap=True, classes="log-panel")
+        # Bottom panel for log output
+        with Vertical(id="bottom-panel", classes="panel"):
+            yield RichLog(id="command-output", wrap=True, classes="log-panel")
 
         # Bottom input for commands
         yield Input(placeholder="Enter a command (type 'help' for options)", id="command-input")
@@ -65,12 +88,38 @@ class MobTrackerApp(App):
         self.key_bindings()
         self.query_one("#command-input", Input).focus()
 
-    def _refresh_mob_list(self) -> None:
-        """Refreshes the mob list panel."""
+    def _refresh_display(self) -> None:
+        """Refreshes both the PC and mob list panels."""
+        # Update PC list panel
+        pc_list = self.query_one("#pc-list", Static)
+
+        pc_lines = []
+        for i, pc in enumerate(self.pcs):
+            status_icon = "[✓]" if pc.status == "Alive" else "[X]"
+            stun_indicator = " ⚡" if pc.stunned else ""
+
+            # Add morale status indicator
+            morale_indicator = ""
+            if pc.morale_status == "Panicked":
+                morale_indicator = " 😱"
+            elif pc.morale_status == "Routed":
+                morale_indicator = " 🏃"
+
+            # Show morale and min_hp only if they're not the default values for PCs
+            morale_indicator_display = f" [Morale: {pc.morale}]" if pc.morale != 9 else ""
+            min_hp_indicator = f" [MinHP: {pc.min_hp}]" if pc.min_hp != -10 else ""
+
+            pc_lines.append(f"[{i+1}] {status_icon} {pc.name}{stun_indicator}{morale_indicator} ({pc.hp}/{pc.max_hp} HP){morale_indicator_display}{min_hp_indicator}")
+
+        pc_list.update("\n".join(pc_lines))
+
+        # Update mob list panel
         mob_list = self.query_one("#mob-list", Static)
 
-        lines = []
+        mob_lines = []
         for i, mob in enumerate(self.mobs):
+            # Calculate the actual index for the mob (PCs are 1 to len(pcs), so mobs start at len(pcs)+1)
+            mob_actual_index = len(self.pcs) + i + 1
             status_icon = "[✓]" if mob.status == "Alive" else "[X]"
             stun_indicator = " ⚡" if mob.stunned else ""
 
@@ -84,9 +133,9 @@ class MobTrackerApp(App):
             # Show min_hp if it's not the default value
             min_hp_indicator = f" [MinHP: {mob.min_hp}]" if mob.min_hp != 0 else ""
 
-            lines.append(f"[{i+1}] {status_icon} {mob.name}{stun_indicator}{morale_indicator} ({mob.hp}/{mob.max_hp} HP) [Morale: {mob.morale}]{min_hp_indicator}")
+            mob_lines.append(f"[{mob_actual_index}] {status_icon} {mob.name}{stun_indicator}{morale_indicator} ({mob.hp}/{mob.max_hp} HP) [Morale: {mob.morale}]{min_hp_indicator}")
 
-        mob_list.update("\n".join(lines))
+        mob_list.update("\n".join(mob_lines))
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Called when the user submits a command."""
@@ -119,7 +168,7 @@ class MobTrackerApp(App):
 
         self.query_one("#command-input", Input).value = ""
         if should_refresh:
-            self._refresh_mob_list()
+            self._refresh_display()
 
     async def on_key(self, event: events.Key) -> None:
         """Called when a key is pressed."""
@@ -144,7 +193,7 @@ class MobTrackerApp(App):
         return int(dice.roll("2d6"))
 
     def _command_add(self, name: str, hp_str: str, *args) -> bool:
-        """Adds a new mob, handling duplicate names and dice notation."""
+        """Adds a new mob or PC, handling duplicate names and dice notation."""
         name = name.title()
         lower_name = name.lower()
 
@@ -159,6 +208,15 @@ class MobTrackerApp(App):
 
         # Parse optional morale value
         morale = 7  # Default
+        # Parse optional type (pc or mob)
+        entity_type = "mob"  # Default to mob
+
+        # Check if the first argument is the type
+        if args and args[0].lower() in ["pc", "mob"]:
+            entity_type = args[0].lower()
+            args = args[1:]  # Remove the type from args
+
+        # Check if the remaining first argument is the morale
         if args:
             try:
                 morale = int(args[0])
@@ -167,96 +225,146 @@ class MobTrackerApp(App):
             except ValueError:
                 log.write(f"Warning: Invalid morale value '{args[0]}', using default of 7")
 
-        matching_mobs = [m for m in self.mobs if m.name.lower().split(" ")[0] == lower_name]
+        # Determine if it's a PC or mob and add accordingly
+        if entity_type == "pc":
+            # Check for matching PCs for duplicate handling
+            matching_entities = [pc for pc in self.pcs if pc.name.lower().split(" ")[0] == lower_name]
 
-        final_name = name
-        if matching_mobs:
-            if len(matching_mobs) == 1 and " " not in matching_mobs[0].name:
-                matching_mobs[0].name = f"{matching_mobs[0].name} 1"
+            final_name = name
+            if matching_entities:
+                if len(matching_entities) == 1 and " " not in matching_entities[0].name:
+                    matching_entities[0].name = f"{matching_entities[0].name} 1"
 
-            final_name = f"{name} {len(matching_mobs) + 1}"
+                final_name = f"{name} {len(matching_entities) + 1}"
 
-        self.mobs.append(Mob(final_name, hp, morale=morale))
+            # PCs have default morale
+            if len(args) == 0:  # Only set default if no morale was provided
+                morale = 9
+
+            self.pcs.append(PC(final_name, hp, morale=morale))
+            log.write(f"Added PC: {final_name}")
+        else:  # Default to mob
+            # Check for matching mobs for duplicate handling
+            matching_entities = [m for m in self.mobs if m.name.lower().split(" ")[0] == lower_name]
+
+            final_name = name
+            if matching_entities:
+                if len(matching_entities) == 1 and " " not in matching_entities[0].name:
+                    matching_entities[0].name = f"{matching_entities[0].name} 1"
+
+                final_name = f"{name} {len(matching_entities) + 1}"
+
+            self.mobs.append(Mob(final_name, hp, morale=morale))
+            log.write(f"Added Mob: {final_name}")
+
         return True
 
     def _command_damage(self, index: str, amount: str) -> bool:
-        """Applies damage to a mob."""
+        """Applies damage to a mob or PC."""
         log = self.query_one("#command-output", RichLog)
 
+        # Try to find the entity in PCs first, then in mobs
         try:
-            mob_index = int(index) - 1
-            mob = self.mobs[mob_index]
+            entity_index = int(index) - 1
+            if entity_index < len(self.pcs):
+                # It's a PC
+                entity = self.pcs[entity_index]
+                entity_type = "PC"
+            elif entity_index < len(self.pcs) + len(self.mobs):
+                # It's a mob
+                mob_index = entity_index - len(self.pcs)
+                entity = self.mobs[mob_index]
+                entity_type = "mob"
+            else:
+                log.write("Error: Invalid entity index.")
+                return False
+        except ValueError:
+            log.write("Error: Invalid entity index.")
+            return False
+
+        try:
             damage = int(amount)
-        except (ValueError, IndexError):
-            log.write("Error: Invalid mob index or damage amount.")
-            return False  # Don't refresh on error
+        except ValueError:
+            log.write("Error: Invalid damage amount.")
+            return False
 
         # Check if damage is 25% or more of current HP before applying damage
-        # OR if mob's HP is already below 0, every hit causes stun
-        if (mob.hp > 0 and damage >= mob.hp * 0.25) or mob.hp < 0:
-            mob.stunned = True
-            log.write(f"{mob.name} has been stunned!")
+        # OR if entity's HP is already below 0, every hit causes stun
+        if (entity.hp > 0 and damage >= entity.hp * 0.25) or entity.hp < 0:
+            entity.stunned = True
+            log.write(f"{entity.name} has been stunned!")
 
-        mob.hp -= damage
-        if mob.hp <= mob.min_hp:
-            mob.status = "Defeated"
+        entity.hp -= damage
+        if entity.hp <= entity.min_hp:
+            entity.status = "Defeated"
+
         return True
 
     def _command_check(self, check_type: str, index: str) -> bool:
-        """Performs a morale check for a mob."""
+        """Performs a morale check for a mob or PC."""
         log = self.query_one("#command-output", RichLog)
 
+        # Try to find the entity in PCs first, then in mobs
         try:
-            mob_index = int(index) - 1
-            mob = self.mobs[mob_index]
-        except (ValueError, IndexError):
-            log.write("Error: Invalid mob index.")
-            return False  # Don't refresh on error
+            entity_index = int(index) - 1
+            if entity_index < len(self.pcs):
+                # It's a PC
+                entity = self.pcs[entity_index]
+            elif entity_index < len(self.pcs) + len(self.mobs):
+                # It's a mob
+                mob_index = entity_index - len(self.pcs)
+                entity = self.mobs[mob_index]
+            else:
+                log.write("Error: Invalid entity index.")
+                return False
+        except ValueError:
+            log.write("Error: Invalid entity index.")
+            return False
 
         check_type_lower = check_type.lower()
 
         if check_type_lower == "braveness":
             roll = self._roll_2d6()
-            if roll >= mob.morale:
-                log.write(f"{mob.name} passes braveness check (rolled {roll} vs {mob.morale} morale) - ready for melee!")
+            if roll >= entity.morale:
+                log.write(f"{entity.name} passes braveness check (rolled {roll} vs {entity.morale} morale) - ready for melee!")
             else:
-                log.write(f"{mob.name} fails braveness check (rolled {roll} vs {mob.morale} morale) - won't engage in melee!")
-                # On failure, the mob might become panicked or routed depending on interpretation
-                mob.morale_status = "Panicked"
-                log.write(f"{mob.name} is now panicked!")
+                log.write(f"{entity.name} fails braveness check (rolled {roll} vs {entity.morale} morale) - won't engage in melee!")
+                # On failure, the entity might become panicked or routed depending on interpretation
+                entity.morale_status = "Panicked"
+                log.write(f"{entity.name} is now panicked!")
         elif check_type_lower == "boldness":
             roll = self._roll_2d6()
-            if roll >= mob.morale:
-                log.write(f"{mob.name} passes boldness check (rolled {roll} vs {mob.morale} morale) - continues fighting!")
+            if roll >= entity.morale:
+                log.write(f"{entity.name} passes boldness check (rolled {roll} vs {entity.morale} morale) - continues fighting!")
                 # Success: gain +1 permanent morale
-                mob.morale = min(12, mob.morale + 1)  # Cap at 12
-                log.write(f"{mob.name}'s morale increases to {mob.morale}!")
+                entity.morale = min(12, entity.morale + 1)  # Cap at 12
+                log.write(f"{entity.name}'s morale increases to {entity.morale}!")
             else:
-                log.write(f"{mob.name} fails boldness check (rolled {roll} vs {mob.morale} morale) - falls back/routs!")
+                log.write(f"{entity.name} fails boldness check (rolled {roll} vs {entity.morale} morale) - falls back/routs!")
                 # Failure: become panicked or routed
-                mob.morale_status = "Routed"
-                log.write(f"{mob.name} is now routed!")
+                entity.morale_status = "Routed"
+                log.write(f"{entity.name} is now routed!")
         elif check_type_lower == "panic":
             # Panic checks have a +2 bonus according to the wiki
             roll = self._roll_2d6()
             modified_roll = roll + 2
-            if modified_roll >= mob.morale:
-                log.write(f"{mob.name} passes panic check (rolled {roll}+2={modified_roll} vs {mob.morale} morale) - holds position!")
+            if modified_roll >= entity.morale:
+                log.write(f"{entity.name} passes panic check (rolled {roll}+2={modified_roll} vs {entity.morale} morale) - holds position!")
             else:
-                log.write(f"{mob.name} fails panic check (rolled {roll}+2={modified_roll} vs {mob.morale} morale) - panics!")
-                mob.morale_status = "Panicked"
-                log.write(f"{mob.name} is now panicked!")
+                log.write(f"{entity.name} fails panic check (rolled {roll}+2={modified_roll} vs {entity.morale} morale) - panics!")
+                entity.morale_status = "Panicked"
+                log.write(f"{entity.name} is now panicked!")
         elif check_type_lower == "rally":
-            if mob.morale_status == "Normal":
-                log.write(f"{mob.name} is already normal and doesn't need to rally.")
+            if entity.morale_status == "Normal":
+                log.write(f"{entity.name} is already normal and doesn't need to rally.")
                 return True
 
             roll = self._roll_2d6()
-            if roll >= mob.morale:
-                log.write(f"{mob.name} successfully rallies (rolled {roll} vs {mob.morale} morale) - returns to normal!")
-                mob.morale_status = "Normal"
+            if roll >= entity.morale:
+                log.write(f"{entity.name} successfully rallies (rolled {roll} vs {entity.morale} morale) - returns to normal!")
+                entity.morale_status = "Normal"
             else:
-                log.write(f"{mob.name} fails to rally (rolled {roll} vs {mob.morale} morale) - remains {mob.morale_status.lower()}.")
+                log.write(f"{entity.name} fails to rally (rolled {roll} vs {entity.morale} morale) - remains {entity.morale_status.lower()}.")
         else:
             log.write(f"Error: Unknown check type '{check_type}'. Supported checks: braveness, boldness, panic, rally")
             return False
@@ -268,59 +376,69 @@ class MobTrackerApp(App):
 
 
     def _command_set(self, property_name: str, index: str, value: str) -> bool:
-        """Sets a property of a mob directly."""
+        """Sets a property of a mob or PC directly."""
         log = self.query_one("#command-output", RichLog)
 
+        # Try to find the entity in PCs first, then in mobs
         try:
-            mob_index = int(index) - 1
-            mob = self.mobs[mob_index]
-        except (ValueError, IndexError):
-            log.write("Error: Invalid mob index.")
-            return False  # Don't refresh on error
+            entity_index = int(index) - 1
+            if entity_index < len(self.pcs):
+                # It's a PC
+                entity = self.pcs[entity_index]
+            elif entity_index < len(self.pcs) + len(self.mobs):
+                # It's a mob
+                mob_index = entity_index - len(self.pcs)
+                entity = self.mobs[mob_index]
+            else:
+                log.write("Error: Invalid entity index.")
+                return False
+        except ValueError:
+            log.write("Error: Invalid entity index.")
+            return False
 
         if property_name.lower() == "morale":
             try:
                 new_value = int(value)
                 # Ensure morale is within valid range (2-12)
                 new_value = max(2, min(12, new_value))
-                old_value = mob.morale
-                mob.morale = new_value
-                log.write(f"{mob.name}'s morale changed from {old_value} to {new_value}.")
+                old_value = entity.morale
+                entity.morale = new_value
+                log.write(f"{entity.name}'s morale changed from {old_value} to {new_value}.")
             except ValueError:
                 log.write(f"Error: Invalid value '{value}' for property '{property_name}'.")
                 return False
         elif property_name.lower() == "min_hp":
             try:
                 new_value = int(value)
-                old_value = mob.min_hp
-                mob.min_hp = new_value
-                log.write(f"{mob.name}'s minimum HP changed from {old_value} to {new_value}.")
+                old_value = entity.min_hp
+                entity.min_hp = new_value
+                log.write(f"{entity.name}'s minimum HP changed from {old_value} to {new_value}.")
             except ValueError:
                 log.write(f"Error: Invalid value '{value}' for property '{property_name}'.")
                 return False
         elif property_name.lower() == "stunned":
             if value.lower() in ["true", "yes", "1", "on"]:
-                mob.stunned = True
-                log.write(f"{mob.name} is now stunned.")
+                entity.stunned = True
+                log.write(f"{entity.name} is now stunned.")
             elif value.lower() in ["false", "no", "0", "off"]:
-                mob.stunned = False
-                log.write(f"{mob.name} is no longer stunned.")
+                entity.stunned = False
+                log.write(f"{entity.name} is no longer stunned.")
             else:
                 log.write(f"Error: Invalid value '{value}' for stunned property. Use true/false, yes/no, 1/0, or on/off.")
                 return False
         elif property_name.lower() == "morale_status":
             valid_statuses = ["normal", "panicked", "routed"]
             if value.lower() in valid_statuses:
-                mob.morale_status = value.lower().capitalize()
-                log.write(f"{mob.name}'s morale status changed to {mob.morale_status}.")
+                entity.morale_status = value.lower().capitalize()
+                log.write(f"{entity.name}'s morale status changed to {entity.morale_status}.")
             else:
                 log.write(f"Error: Invalid value '{value}' for morale_status property. Use: {', '.join(valid_statuses)}")
                 return False
         elif property_name.lower() == "status":
             valid_statuses = ["alive", "defeated"]
             if value.lower() in valid_statuses:
-                mob.status = value.lower().capitalize()
-                log.write(f"{mob.name}'s status changed to {mob.status}.")
+                entity.status = value.lower().capitalize()
+                log.write(f"{entity.name}'s status changed to {entity.status}.")
             else:
                 log.write(f"Error: Invalid value '{value}' for status property. Use: {', '.join(valid_statuses)}")
                 return False
@@ -331,31 +449,41 @@ class MobTrackerApp(App):
         return True
 
     def _command_unstun(self, index: str) -> bool:
-        """Removes the stunned status from a mob."""
+        """Removes the stunned status from a mob or PC."""
         log = self.query_one("#command-output", RichLog)
 
+        # Try to find the entity in PCs first, then in mobs
         try:
-            mob_index = int(index) - 1
-            mob = self.mobs[mob_index]
-        except (ValueError, IndexError):
-            log.write("Error: Invalid mob index.")
-            return False  # Don't refresh on error
+            entity_index = int(index) - 1
+            if entity_index < len(self.pcs):
+                # It's a PC
+                entity = self.pcs[entity_index]
+            elif entity_index < len(self.pcs) + len(self.mobs):
+                # It's a mob
+                mob_index = entity_index - len(self.pcs)
+                entity = self.mobs[mob_index]
+            else:
+                log.write("Error: Invalid entity index.")
+                return False
+        except ValueError:
+            log.write("Error: Invalid entity index.")
+            return False
 
-        if mob.stunned:
-            mob.stunned = False
-            log.write(f"{mob.name} has been unstunned!")
+        if entity.stunned:
+            entity.stunned = False
+            log.write(f"{entity.name} has been unstunned!")
         else:
-            log.write(f"{mob.name} is not stunned.")
+            log.write(f"{entity.name} is not stunned.")
         return True
 
     def _command_help(self) -> bool:
         """Displays help information."""
         log = self.query_one("#command-output", RichLog)
         log.write("\nAvailable commands:\n"
-                  "- add <name> <hp or dice notation> [morale]\n"
-                  "- damage <index> <amount>\n"
+                  "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
+                  "- damage <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
                   "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
-                  "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5, set stunned 1 true)\n"
+                  "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
                   "- help\n"
                   "- exit")
@@ -368,7 +496,7 @@ class MobTrackerApp(App):
     def on_ready(self) -> None:
         """Called when the app is ready to start."""
         self.title = "Higher Path Combat Tracker"
-        self._refresh_mob_list()
+        self._refresh_display()
 
     def key_bindings(self) -> None:
         """Define key bindings for the app."""
@@ -381,10 +509,10 @@ class MobTrackerApp(App):
         """Show help information."""
         log = self.query_one("#command-output", RichLog)
         log.write("\nAvailable commands:\n"
-                  "- add <name> <hp or dice notation> [morale]\n"
-                  "- damage <index> <amount>\n"
+                  "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
+                  "- damage <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
                   "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
-                  "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5, set stunned 1 true)\n"
+                  "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
                   "- help\n"
                   "- exit\n\n"
@@ -392,7 +520,7 @@ class MobTrackerApp(App):
                   "- Ctrl+H: Show help\n"
                   "- Ctrl+Q: Quit application\n"
                   "- Up/Down: Command history")
-        self._refresh_mob_list()
+        self._refresh_display()
 
     def action_quit_app(self) -> None:
         """Quit the application."""
@@ -424,8 +552,17 @@ Horizontal {
     height: 1fr;
 }
 
-#left-panel {
-    width: 2fr;
+#pc-panel {
+    width: 1fr;
+    height: 1fr;
+    border: solid $secondary;
+    background: $panel;
+    padding: 0;
+    margin: 0;
+}
+
+#mob-panel {
+    width: 1fr;
     height: 1fr;
     border: solid $primary;
     background: $panel;
@@ -433,8 +570,7 @@ Horizontal {
     margin: 0;
 }
 
-#right-panel {
-    width: 1fr;
+#bottom-panel {
     height: 1fr;
     border: solid $success;
     background: $panel;
@@ -442,10 +578,28 @@ Horizontal {
     margin: 0;
 }
 
+.pc-list-panel {
+    height: 1fr;
+    width: 1fr;
+    border: solid $secondary;
+    background: $surface;
+    padding: 1;
+    content-align: left top;
+}
+
 .mob-list-panel {
     height: 1fr;
     width: 1fr;
     border: solid $primary;
+    background: $surface;
+    padding: 1;
+    content-align: left top;
+}
+
+.log-panel {
+    height: 1fr;
+    width: 1fr;
+    border: solid $success;
     background: $surface;
     padding: 1;
     content-align: left top;
