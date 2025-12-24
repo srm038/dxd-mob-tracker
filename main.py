@@ -32,6 +32,10 @@ class PC:
     min_hp: int = -10  # PCs can survive with negative HP up to -10
     damage_dealt: int = 0  # Total damage dealt by this PC
     damage_taken: int = 0  # Total damage taken by this PC
+    xp_damage_taken: int = 0  # XP earned from damage taken (20 XP per HP)
+    xp_damage_dealt: int = 0  # XP earned from damage dealt (10 XP per HP)
+    xp_bonus: int = 0  # Bonus XP from party damage taken
+    total_xp: int = 0  # Total XP accumulated
 
     def __post_init__(self):
         self.hp = self.max_hp
@@ -61,6 +65,7 @@ class MobTrackerApp(App):
             "reset": self._command_reset,
             "remove": self._command_remove,
             "clear": self._command_clear,
+            "xp": self._command_xp,
             "help": self._command_help,
             "exit": self.exit,
         }
@@ -117,8 +122,10 @@ class MobTrackerApp(App):
             # Show damage stats if they're not zero
             damage_dealt_indicator = f" [Dmg+: {pc.damage_dealt}]" if pc.damage_dealt > 0 else ""
             damage_taken_indicator = f" [Dmg-: {pc.damage_taken}]" if pc.damage_taken > 0 else ""
+            # Show XP if it's not zero
+            xp_indicator = f" [XP: {pc.total_xp}]" if pc.total_xp > 0 else ""
 
-            pc_lines.append(f"[{i+1}] {status_icon} {pc.name}{stun_indicator}{morale_indicator} ({pc.hp}/{pc.max_hp} HP){morale_indicator_display}{min_hp_indicator}{damage_dealt_indicator}{damage_taken_indicator}")
+            pc_lines.append(f"[{i+1}] {status_icon} {pc.name}{stun_indicator}{morale_indicator} ({pc.hp}/{pc.max_hp} HP){morale_indicator_display}{min_hp_indicator}{damage_dealt_indicator}{damage_taken_indicator}{xp_indicator}")
 
         pc_list.update("\n".join(pc_lines))
 
@@ -300,6 +307,9 @@ class MobTrackerApp(App):
         # Apply damage with stunning check
         self._apply_damage(entity, damage, log, entity.name)
 
+        # Recalculate XP for all PCs
+        self._recalculate_xp()
+
         return True
 
     def _command_check(self, check_type: str, index: str) -> bool:
@@ -463,6 +473,34 @@ class MobTrackerApp(App):
         if target.hp <= target.min_hp:
             target.status = "Defeated"
 
+    def _recalculate_xp(self) -> None:
+        """Recalculates XP for all PCs based on current damage stats."""
+        # Calculate total party damage taken by alive PCs
+        total_party_damage_taken = sum(pc.damage_taken for pc in self.pcs if pc.status != "Defeated")
+
+        for pc in self.pcs:
+            if pc.status == "Defeated":
+                # Dead characters receive no XP
+                pc.xp_damage_taken = 0
+                pc.xp_damage_dealt = 0
+                pc.xp_bonus = 0
+            else:
+                # XP for damage taken: 20 XP per HP
+                pc.xp_damage_taken = pc.damage_taken * 20
+
+                # XP for damage dealt: 10 XP per HP
+                pc.xp_damage_dealt = pc.damage_dealt * 10
+
+                # Bonus XP: 20 XP per total HP of damage taken by friendly side
+                # Distributed among alive PCs
+                alive_pcs = [p for p in self.pcs if p.status != "Defeated"]
+                if alive_pcs:
+                    pc.xp_bonus = total_party_damage_taken * 20 // len(alive_pcs)
+                else:
+                    pc.xp_bonus = 0
+
+            pc.total_xp = pc.xp_damage_taken + pc.xp_damage_dealt + pc.xp_bonus
+
     def _command_combat(self, attacker_index: str, target_index: str, damage_amount: str) -> bool:
         """Handles combat actions like 'combat 1 4 3' where PC 1 hits mob 4 for 3 damage."""
         log = self.query_one("#command-output", RichLog)
@@ -507,6 +545,10 @@ class MobTrackerApp(App):
             target.damage_taken += damage
 
         log.write(f"{attacker.name} hits {target.name} for {damage} damage!")
+
+        # Recalculate XP for all PCs
+        self._recalculate_xp()
+
         return True
 
     def _command_remove(self, index: str) -> bool:
@@ -544,7 +586,48 @@ class MobTrackerApp(App):
             pc.damage_taken = 0
 
         log.write("All PC damage statistics have been reset for a new combat!")
+
+        # Recalculate XP for all PCs
+        self._recalculate_xp()
+
         return True
+
+    def _command_xp(self, action: str = "") -> bool:
+        """Calculates and displays XP for PCs based on combat actions."""
+        log = self.query_one("#command-output", RichLog)
+
+        action_lower = action.lower() if action else ""
+
+        if action_lower == "calculate" or action_lower == "":
+            # Recalculate XP for all PCs
+            self._recalculate_xp()
+
+            log.write("XP calculated for all PCs based on combat actions!")
+            self._show_xp_breakdown()
+        elif action_lower == "show":
+            self._show_xp_breakdown()
+        else:
+            log.write("Error: Invalid action. Use 'calculate' (default), 'show', or leave empty.")
+            return False
+
+        return True
+
+    def _show_xp_breakdown(self) -> None:
+        """Shows XP breakdown for all PCs."""
+        log = self.query_one("#command-output", RichLog)
+
+        if not self.pcs:
+            log.write("No PCs to show XP for.")
+            return
+
+        log.write("\nXP Breakdown:")
+        for i, pc in enumerate(self.pcs):
+            status = "(DEFEATED)" if pc.status == "Defeated" else ""
+            log.write(f"  {i+1}. {pc.name} {status}")
+            log.write(f"     Damage Taken XP: {pc.xp_damage_taken} ({pc.damage_taken} HP × 20)")
+            log.write(f"     Damage Dealt XP: {pc.xp_damage_dealt} ({pc.damage_dealt} HP × 10)")
+            log.write(f"     Bonus XP: {pc.xp_bonus}")
+            log.write(f"     Total XP: {pc.total_xp}")
 
     def _command_clear(self, target: str = "") -> bool:
         """Clears PCs, mobs, or both lists."""
@@ -610,6 +693,7 @@ class MobTrackerApp(App):
                   "- remove <index> (remove entity by index)\n"
                   "- clear [pcs|mobs|all] (clear all entities of specified type)\n"
                   "- reset (reset all PC damage statistics for a new combat)\n"
+                  "- xp [calculate|show] (calculate XP based on damage or show XP breakdown)\n"
                   "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
@@ -643,6 +727,7 @@ class MobTrackerApp(App):
                   "- remove <index> (remove entity by index)\n"
                   "- clear [pcs|mobs|all] (clear all entities of specified type)\n"
                   "- reset (reset all PC damage statistics for a new combat)\n"
+                  "- xp [calculate|show] (calculate XP based on damage or show XP breakdown)\n"
                   "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
