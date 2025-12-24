@@ -772,7 +772,7 @@ Horizontal {
 #pc-panel {
     width: 1fr;
     height: 1fr;
-    border: solid $secondary;
+    border: none;
     background: $panel;
     padding: 0;
     margin: 0;
@@ -781,7 +781,7 @@ Horizontal {
 #mob-panel {
     width: 1fr;
     height: 1fr;
-    border: solid $primary;
+    border: none;
     background: $panel;
     padding: 0;
     margin: 0;
@@ -789,7 +789,7 @@ Horizontal {
 
 #bottom-panel {
     height: 1fr;
-    border: solid $success;
+    border: none;
     background: $panel;
     padding: 0;
     margin: 0;
@@ -818,7 +818,7 @@ Horizontal {
     width: 1fr;
     border: none;
     background: $surface;
-    padding: 0;
+    padding: 1;
     content-align: left top;
 }
 
@@ -829,7 +829,9 @@ Horizontal {
     border: none;
     background: $surface;
     color: $text;
-    padding-left: 3;  /* Make space for the > prompt */
+    padding: 0 1;  /* Consistent padding with other panels */
+    border-top: solid $primary;
+    text-style: bold;
 }
 
 Header {
@@ -839,14 +841,13 @@ Header {
 }
 
 Footer {
-    background: $primary;
-    color: $text;
-    text-style: bold;
+    display: none;
 }
 
 Static {
     border: none;
     background: $surface;
+    padding: 1;
 }
 
 RichLog {
