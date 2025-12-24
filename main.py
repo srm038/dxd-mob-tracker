@@ -308,24 +308,54 @@ class MobTrackerApp(App):
             log.write("Error: Invalid mob index.")
             return False  # Don't refresh on error
 
-        try:
-            if property_name.lower() == "morale":
+        if property_name.lower() == "morale":
+            try:
                 new_value = int(value)
                 # Ensure morale is within valid range (2-12)
                 new_value = max(2, min(12, new_value))
                 old_value = mob.morale
                 mob.morale = new_value
                 log.write(f"{mob.name}'s morale changed from {old_value} to {new_value}.")
-            elif property_name.lower() == "min_hp":
+            except ValueError:
+                log.write(f"Error: Invalid value '{value}' for property '{property_name}'.")
+                return False
+        elif property_name.lower() == "min_hp":
+            try:
                 new_value = int(value)
                 old_value = mob.min_hp
                 mob.min_hp = new_value
                 log.write(f"{mob.name}'s minimum HP changed from {old_value} to {new_value}.")
-            else:
-                log.write(f"Error: Unknown property '{property_name}'. Supported properties: morale, min_hp")
+            except ValueError:
+                log.write(f"Error: Invalid value '{value}' for property '{property_name}'.")
                 return False
-        except ValueError:
-            log.write(f"Error: Invalid value '{value}' for property '{property_name}'.")
+        elif property_name.lower() == "stunned":
+            if value.lower() in ["true", "yes", "1", "on"]:
+                mob.stunned = True
+                log.write(f"{mob.name} is now stunned.")
+            elif value.lower() in ["false", "no", "0", "off"]:
+                mob.stunned = False
+                log.write(f"{mob.name} is no longer stunned.")
+            else:
+                log.write(f"Error: Invalid value '{value}' for stunned property. Use true/false, yes/no, 1/0, or on/off.")
+                return False
+        elif property_name.lower() == "morale_status":
+            valid_statuses = ["normal", "panicked", "routed"]
+            if value.lower() in valid_statuses:
+                mob.morale_status = value.lower().capitalize()
+                log.write(f"{mob.name}'s morale status changed to {mob.morale_status}.")
+            else:
+                log.write(f"Error: Invalid value '{value}' for morale_status property. Use: {', '.join(valid_statuses)}")
+                return False
+        elif property_name.lower() == "status":
+            valid_statuses = ["alive", "defeated"]
+            if value.lower() in valid_statuses:
+                mob.status = value.lower().capitalize()
+                log.write(f"{mob.name}'s status changed to {mob.status}.")
+            else:
+                log.write(f"Error: Invalid value '{value}' for status property. Use: {', '.join(valid_statuses)}")
+                return False
+        else:
+            log.write(f"Error: Unknown property '{property_name}'. Supported properties: morale, min_hp, stunned, morale_status, status")
             return False
 
         return True
@@ -358,7 +388,7 @@ class MobTrackerApp(App):
                   "- boldness <index> (check when taking damage)\n"
                   "- panic <index> (check when allies are killed)\n"
                   "- rally <index> (attempt to recover from panic/route)\n"
-                  "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5)\n"
+                  "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
                   "- help\n"
                   "- exit")
@@ -389,7 +419,7 @@ class MobTrackerApp(App):
                   "- boldness <index> (check when taking damage)\n"
                   "- panic <index> (check when allies are killed)\n"
                   "- rally <index> (attempt to recover from panic/route)\n"
-                  "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5)\n"
+                  "- set <property> <index> <value> (set mob property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
                   "- help\n"
                   "- exit\n\n"
