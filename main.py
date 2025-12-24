@@ -30,6 +30,8 @@ class PC:
     morale: int = 9  # Default morale for PCs
     morale_status: str = "Normal"  # Normal, Panicked, Routed
     min_hp: int = -10  # PCs can survive with negative HP up to -10
+    damage_dealt: int = 0  # Total damage dealt by this PC
+    damage_taken: int = 0  # Total damage taken by this PC
 
     def __post_init__(self):
         self.hp = self.max_hp
@@ -55,6 +57,8 @@ class MobTrackerApp(App):
             "check": self._command_check,
             "unstun": self._command_unstun,
             "set": self._command_set,
+            "combat": self._command_combat,
+            "reset": self._command_reset,
             "help": self._command_help,
             "exit": self.exit,
         }
@@ -108,8 +112,11 @@ class MobTrackerApp(App):
             # Show morale and min_hp only if they're not the default values for PCs
             morale_indicator_display = f" [Morale: {pc.morale}]" if pc.morale != 9 else ""
             min_hp_indicator = f" [MinHP: {pc.min_hp}]" if pc.min_hp != -10 else ""
+            # Show damage stats if they're not zero
+            damage_dealt_indicator = f" [Dmg+: {pc.damage_dealt}]" if pc.damage_dealt > 0 else ""
+            damage_taken_indicator = f" [Dmg-: {pc.damage_taken}]" if pc.damage_taken > 0 else ""
 
-            pc_lines.append(f"[{i+1}] {status_icon} {pc.name}{stun_indicator}{morale_indicator} ({pc.hp}/{pc.max_hp} HP){morale_indicator_display}{min_hp_indicator}")
+            pc_lines.append(f"[{i+1}] {status_icon} {pc.name}{stun_indicator}{morale_indicator} ({pc.hp}/{pc.max_hp} HP){morale_indicator_display}{min_hp_indicator}{damage_dealt_indicator}{damage_taken_indicator}")
 
         pc_list.update("\n".join(pc_lines))
 
@@ -288,15 +295,8 @@ class MobTrackerApp(App):
             log.write("Error: Invalid damage amount.")
             return False
 
-        # Check if damage is 25% or more of current HP before applying damage
-        # OR if entity's HP is already below 0, every hit causes stun
-        if (entity.hp > 0 and damage >= entity.hp * 0.25) or entity.hp < 0:
-            entity.stunned = True
-            log.write(f"{entity.name} has been stunned!")
-
-        entity.hp -= damage
-        if entity.hp <= entity.min_hp:
-            entity.status = "Defeated"
+        # Apply damage with stunning check
+        self._apply_damage(entity, damage, log, entity.name)
 
         return True
 
@@ -448,6 +448,77 @@ class MobTrackerApp(App):
 
         return True
 
+    def _apply_damage(self, target, damage: int, log, target_name: str) -> None:
+        """Apply damage to a target and check for stunning effects."""
+        # Check if damage is 25% or more of current HP before applying damage
+        # OR if target's HP is already below 0, every hit causes stun
+        if (target.hp > 0 and damage >= target.hp * 0.25) or target.hp < 0:
+            target.stunned = True
+            log.write(f"{target_name} has been stunned!")
+
+        # Apply damage to target
+        target.hp -= damage
+        if target.hp <= target.min_hp:
+            target.status = "Defeated"
+
+    def _command_combat(self, attacker_index: str, target_index: str, damage_amount: str) -> bool:
+        """Handles combat actions like 'combat 1 4 3' where PC 1 hits mob 4 for 3 damage."""
+        log = self.query_one("#command-output", RichLog)
+
+        try:
+            attacker_idx = int(attacker_index) - 1
+            target_idx = int(target_index) - 1
+            damage = int(damage_amount)
+        except ValueError:
+            log.write("Error: Invalid entity indices or damage amount.")
+            return False
+
+        # Get attacker
+        if attacker_idx < len(self.pcs):
+            attacker = self.pcs[attacker_idx]
+            attacker_type = "PC"
+        elif attacker_idx < len(self.pcs) + len(self.mobs):
+            attacker = self.mobs[attacker_idx - len(self.pcs)]
+            attacker_type = "Mob"
+        else:
+            log.write("Error: Invalid attacker index.")
+            return False
+
+        # Get target
+        if target_idx < len(self.pcs):
+            target = self.pcs[target_idx]
+            target_type = "PC"
+        elif target_idx < len(self.pcs) + len(self.mobs):
+            target = self.mobs[target_idx - len(self.pcs)]
+            target_type = "Mob"
+        else:
+            log.write("Error: Invalid target index.")
+            return False
+
+        # Apply damage with stunning check
+        self._apply_damage(target, damage, log, target.name)
+
+        # Update damage tracking for PCs
+        if attacker_type == "PC":
+            attacker.damage_dealt += damage
+        if target_type == "PC":
+            target.damage_taken += damage
+
+        log.write(f"{attacker.name} hits {target.name} for {damage} damage!")
+        return True
+
+    def _command_reset(self) -> bool:
+        """Resets the damage tracking for all PCs to start a new combat."""
+        log = self.query_one("#command-output", RichLog)
+
+        # Reset damage stats for all PCs
+        for pc in self.pcs:
+            pc.damage_dealt = 0
+            pc.damage_taken = 0
+
+        log.write("All PC damage statistics have been reset for a new combat!")
+        return True
+
     def _command_unstun(self, index: str) -> bool:
         """Removes the stunned status from a mob or PC."""
         log = self.query_one("#command-output", RichLog)
@@ -481,7 +552,9 @@ class MobTrackerApp(App):
         log = self.query_one("#command-output", RichLog)
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
+                  "- combat <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
                   "- damage <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
+                  "- reset (reset all PC damage statistics for a new combat)\n"
                   "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
@@ -510,7 +583,9 @@ class MobTrackerApp(App):
         log = self.query_one("#command-output", RichLog)
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
+                  "- combat <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
                   "- damage <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
+                  "- reset (reset all PC damage statistics for a new combat)\n"
                   "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
