@@ -72,6 +72,8 @@ class MobTrackerApp(App):
             "clear": self._command_clear,
             "clr": self._command_clear,  # Alias for clear
             "xp": self._command_xp,
+            "heal": self._command_heal,
+            "hlp": self._command_heal,  # Alias for heal
             "save": self._command_save,
             "load": self._command_load,
             "help": self._command_help,
@@ -683,6 +685,44 @@ class MobTrackerApp(App):
 
         return True
 
+    def _command_heal(self, index: str, amount: str) -> bool:
+        """Heals a PC or mob by restoring HP."""
+        log = self.query_one("#command-output", RichLog)
+
+        # Try to find the entity in PCs first, then in mobs
+        try:
+            entity_index = int(index) - 1
+            if entity_index < len(self.pcs):
+                # It's a PC
+                entity = self.pcs[entity_index]
+                entity_type = "PC"
+            elif entity_index < len(self.pcs) + len(self.mobs):
+                # It's a mob
+                mob_index = entity_index - len(self.pcs)
+                entity = self.mobs[mob_index]
+                entity_type = "mob"
+            else:
+                log.write("Error: Invalid entity index.")
+                return False
+        except ValueError:
+            log.write("Error: Invalid entity index.")
+            return False
+
+        try:
+            heal_amount = int(amount)
+        except ValueError:
+            log.write("Error: Invalid heal amount.")
+            return False
+
+        # Apply healing to entity
+        old_hp = entity.hp
+        entity.hp = min(entity.max_hp, entity.hp + heal_amount)
+        actual_heal = entity.hp - old_hp
+
+        log.write(f"{entity.name} healed for {actual_heal} HP.")
+
+        return True
+
     def _command_xp(self, action: str = "") -> bool:
         """Calculates and displays XP for PCs based on combat actions."""
         log = self.query_one("#command-output", RichLog)
@@ -781,6 +821,7 @@ class MobTrackerApp(App):
                   "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
                   "- combat/c <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
                   "- damage/dmg <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
+                  "- heal/hlp <index> <amount> (heal entity by amount)\n"
                   "- remove/rm <index> (remove entity by index)\n"
                   "- clear/clr [pcs|mobs|all] (clear all entities of specified type)\n"
                   "- reset/r (reset all PC damage statistics for a new combat)\n"
@@ -817,6 +858,7 @@ class MobTrackerApp(App):
                   "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
                   "- combat/c <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
                   "- damage/dmg <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
+                  "- heal/hlp <index> <amount> (heal entity by amount)\n"
                   "- remove/rm <index> (remove entity by index)\n"
                   "- clear/clr [pcs|mobs|all] (clear all entities of specified type)\n"
                   "- reset/r (reset all PC damage statistics for a new combat)\n"
