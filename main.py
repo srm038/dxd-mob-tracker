@@ -841,7 +841,15 @@ class MobTrackerApp(App):
 
     def on_ready(self) -> None:
         """Called when the app is ready to start."""
-        self.title = "Higher Path Combat Tracker"
+        import subprocess
+        try:
+            # Get the short commit hash from git
+            commit_hash = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+            self.title = f"Higher Path Combat Tracker - {commit_hash}"
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # If git is not available or not a git repo, use default title
+            self.title = "Higher Path Combat Tracker"
+
         self._refresh_display()
 
     def key_bindings(self) -> None:
@@ -962,6 +970,7 @@ Horizontal {
 
 #command-input {
     height: 1;
+    width: 1fr;
     margin: 1 0 0 0;
     border: none;
     background: $surface;
@@ -969,6 +978,14 @@ Horizontal {
     padding: 0 1;  /* Consistent padding with other panels */
     border-top: solid $primary;
     text-style: bold;
+}
+
+#version-info {
+    height: 1;
+    width: 15;
+    dock: right;
+    content-align: right middle;
+    text-style: dim;
 }
 
 Header {
@@ -985,6 +1002,17 @@ Static {
     border: none;
     background: $surface;
     padding: 1;
+}
+
+.command-bar {
+    height: 1;
+}
+
+.version-info {
+    height: 1;
+    width: 15;
+    content-align: right middle;
+    text-style: dim;
 }
 
 RichLog {
