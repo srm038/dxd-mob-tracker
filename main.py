@@ -45,16 +45,8 @@ class MobTrackerApp(App):
 
     def __init__(self):
         super().__init__()
-        self.mobs = [
-            Mob("Goblin", 7),
-            Mob("Orc", 15),
-            Mob("Bugbear", 27),
-        ]
-        self.pcs = [
-            PC("Aldric", 25),
-            PC("Mira", 18),
-            PC("Thorin", 30),
-        ]
+        self.mobs = []
+        self.pcs = []
         self.commands = {
             "add": self._command_add,
             "damage": self._command_damage,
@@ -605,82 +597,186 @@ class MobTrackerApp(App):
 
         return True
 
-    def _command_save(self, filename: str = "pcs.json") -> bool:
-        """Saves the current PCs to a JSON file."""
+    def _command_save(self, target: str, filename: str = "") -> bool:
+        """Saves the current PCs or Mobs to a JSON file."""
         import json
         log = self.query_one("#command-output", RichLog)
 
+        # Check if target is actually a filename (for backward compatibility)
+        if target and not (target.lower() == "pcs" or target.lower() == "mobs"):
+            # If target is not 'pcs' or 'mobs', treat it as a filename and assume 'pcs'
+            if not filename:
+                filename = target
+                target = "pcs"
+            else:
+                log.write("Error: Invalid target. Use 'pcs' or 'mobs'.")
+                return False
+
+        # If target is still empty, show error
+        if not target or (target.lower() != "pcs" and target.lower() != "mobs"):
+            log.write("Error: Target required. Use 'pcs' or 'mobs'.")
+            return False
+
+        target_lower = target.lower()
+
+        # Determine filename based on target if not provided
+        if not filename:
+            if target_lower == "pcs":
+                filename = "pcs.json"
+            elif target_lower == "mobs":
+                filename = "mobs.json"
+            else:
+                log.write("Error: Invalid target. Use 'pcs' or 'mobs'.")
+                return False
+
         try:
-            # Convert PCs to dictionary format for JSON serialization
-            pc_data = []
-            for pc in self.pcs:
-                pc_dict = {
-                    "name": pc.name,
-                    "max_hp": pc.max_hp,
-                    "hp": pc.hp,
-                    "status": pc.status,
-                    "stunned": pc.stunned,
-                    "morale": pc.morale,
-                    "morale_status": pc.morale_status,
-                    "min_hp": pc.min_hp,
-                    "damage_dealt": pc.damage_dealt,
-                    "damage_taken": pc.damage_taken,
-                    "xp_damage_taken": pc.xp_damage_taken,
-                    "xp_damage_dealt": pc.xp_damage_dealt,
-                    "xp_bonus": pc.xp_bonus,
-                    "total_xp": pc.total_xp
-                }
-                pc_data.append(pc_dict)
+            if target_lower == "pcs":
+                # Convert PCs to dictionary format for JSON serialization
+                pc_data = []
+                for pc in self.pcs:
+                    pc_dict = {
+                        "name": pc.name,
+                        "max_hp": pc.max_hp,
+                        "hp": pc.hp,
+                        "status": pc.status,
+                        "stunned": pc.stunned,
+                        "morale": pc.morale,
+                        "morale_status": pc.morale_status,
+                        "min_hp": pc.min_hp,
+                        "damage_dealt": pc.damage_dealt,
+                        "damage_taken": pc.damage_taken,
+                        "xp_damage_taken": pc.xp_damage_taken,
+                        "xp_damage_dealt": pc.xp_damage_dealt,
+                        "xp_bonus": pc.xp_bonus,
+                        "total_xp": pc.total_xp
+                    }
+                    pc_data.append(pc_dict)
 
-            with open(filename, 'w') as f:
-                json.dump(pc_data, f, indent=2)
+                with open(filename, 'w') as f:
+                    json.dump(pc_data, f, indent=2)
 
-            log.write(f"PCs saved to {filename}.")
+                log.write(f"PCs saved to {filename}.")
+            elif target_lower == "mobs":
+                # Convert Mobs to dictionary format for JSON serialization
+                mob_data = []
+                for mob in self.mobs:
+                    mob_dict = {
+                        "name": mob.name,
+                        "max_hp": mob.max_hp,
+                        "hp": mob.hp,
+                        "status": mob.status,
+                        "stunned": mob.stunned,
+                        "morale": mob.morale,
+                        "morale_status": mob.morale_status,
+                        "min_hp": mob.min_hp
+                    }
+                    mob_data.append(mob_dict)
+
+                with open(filename, 'w') as f:
+                    json.dump(mob_data, f, indent=2)
+
+                log.write(f"Mobs saved to {filename}.")
+            else:
+                log.write("Error: Invalid target. Use 'pcs' or 'mobs'.")
+                return False
         except Exception as e:
-            log.write(f"Error saving PCs: {e}")
+            log.write(f"Error saving {target}: {e}")
             return False
 
         return True
 
-    def _command_load(self, filename: str = "pcs.json") -> bool:
-        """Loads PCs from a JSON file."""
+    def _command_load(self, target: str, filename: str = "") -> bool:
+        """Loads PCs or Mobs from a JSON file."""
         import json
         log = self.query_one("#command-output", RichLog)
 
+        # Check if target is actually a filename (for backward compatibility)
+        if target and not (target.lower() == "pcs" or target.lower() == "mobs"):
+            # If target is not 'pcs' or 'mobs', treat it as a filename and assume 'pcs'
+            if not filename:
+                filename = target
+                target = "pcs"
+            else:
+                log.write("Error: Invalid target. Use 'pcs' or 'mobs'.")
+                return False
+
+        # If target is still empty, show error
+        if not target or (target.lower() != "pcs" and target.lower() != "mobs"):
+            log.write("Error: Target required. Use 'pcs' or 'mobs'.")
+            return False
+
+        target_lower = target.lower()
+
+        # Determine filename based on target if not provided
+        if not filename:
+            if target_lower == "pcs":
+                filename = "pcs.json"
+            elif target_lower == "mobs":
+                filename = "mobs.json"
+            else:
+                log.write("Error: Invalid target. Use 'pcs' or 'mobs'.")
+                return False
+
         try:
             with open(filename, 'r') as f:
-                pc_data = json.load(f)
+                data = json.load(f)
 
-            # Clear current PCs and load new ones
-            self.pcs.clear()
+            if target_lower == "pcs":
+                # Loading PCs
+                # Clear current PCs and load new ones
+                self.pcs.clear()
 
-            for pc_dict in pc_data:
-                pc = PC(
-                    name=pc_dict["name"],
-                    max_hp=pc_dict["max_hp"]
-                )
-                # Set other attributes
-                pc.hp = pc_dict["hp"]
-                pc.status = pc_dict["status"]
-                pc.stunned = pc_dict["stunned"]
-                pc.morale = pc_dict["morale"]
-                pc.morale_status = pc_dict["morale_status"]
-                pc.min_hp = pc_dict["min_hp"]
-                pc.damage_dealt = pc_dict["damage_dealt"]
-                pc.damage_taken = pc_dict["damage_taken"]
-                pc.xp_damage_taken = pc_dict["xp_damage_taken"]
-                pc.xp_damage_dealt = pc_dict["xp_damage_dealt"]
-                pc.xp_bonus = pc_dict["xp_bonus"]
-                pc.total_xp = pc_dict["total_xp"]
+                for pc_dict in data:
+                    pc = PC(
+                        name=pc_dict["name"],
+                        max_hp=pc_dict["max_hp"]
+                    )
+                    # Set other attributes
+                    pc.hp = pc_dict["hp"]
+                    pc.status = pc_dict["status"]
+                    pc.stunned = pc_dict["stunned"]
+                    pc.morale = pc_dict["morale"]
+                    pc.morale_status = pc_dict["morale_status"]
+                    pc.min_hp = pc_dict["min_hp"]
+                    pc.damage_dealt = pc_dict.get("damage_dealt", 0)
+                    pc.damage_taken = pc_dict.get("damage_taken", 0)
+                    pc.xp_damage_taken = pc_dict.get("xp_damage_taken", 0)
+                    pc.xp_damage_dealt = pc_dict.get("xp_damage_dealt", 0)
+                    pc.xp_bonus = pc_dict.get("xp_bonus", 0)
+                    pc.total_xp = pc_dict.get("total_xp", 0)
 
-                self.pcs.append(pc)
+                    self.pcs.append(pc)
 
-            log.write(f"PCs loaded from {filename}.")
+                log.write(f"PCs loaded from {filename}.")
+            elif target_lower == "mobs":
+                # Loading Mobs
+                # Clear current Mobs and load new ones
+                self.mobs.clear()
+
+                for mob_dict in data:
+                    mob = Mob(
+                        name=mob_dict["name"],
+                        max_hp=mob_dict["max_hp"]
+                    )
+                    # Set other attributes
+                    mob.hp = mob_dict["hp"]
+                    mob.status = mob_dict["status"]
+                    mob.stunned = mob_dict["stunned"]
+                    mob.morale = mob_dict["morale"]
+                    mob.morale_status = mob_dict["morale_status"]
+                    mob.min_hp = mob_dict["min_hp"]
+
+                    self.mobs.append(mob)
+
+                log.write(f"Mobs loaded from {filename}.")
+            else:
+                log.write("Error: Invalid target. Use 'pcs' or 'mobs'.")
+                return False
         except FileNotFoundError:
             log.write(f"Error: File {filename} not found.")
             return False
         except Exception as e:
-            log.write(f"Error loading PCs: {e}")
+            log.write(f"Error loading from {filename}: {e}")
             return False
 
         return True
@@ -720,6 +816,74 @@ class MobTrackerApp(App):
         actual_heal = entity.hp - old_hp
 
         log.write(f"{entity.name} healed for {actual_heal} HP.")
+
+        return True
+
+    def _command_save_pcs(self, filename: str = "pcs.json") -> bool:
+        """Saves the current PCs to a JSON file."""
+        import json
+        log = self.query_one("#command-output", RichLog)
+
+        try:
+            # Convert PCs to dictionary format for JSON serialization
+            pc_data = []
+            for pc in self.pcs:
+                pc_dict = {
+                    "name": pc.name,
+                    "max_hp": pc.max_hp,
+                    "hp": pc.hp,
+                    "status": pc.status,
+                    "stunned": pc.stunned,
+                    "morale": pc.morale,
+                    "morale_status": pc.morale_status,
+                    "min_hp": pc.min_hp,
+                    "damage_dealt": pc.damage_dealt,
+                    "damage_taken": pc.damage_taken,
+                    "xp_damage_taken": pc.xp_damage_taken,
+                    "xp_damage_dealt": pc.xp_damage_dealt,
+                    "xp_bonus": pc.xp_bonus,
+                    "total_xp": pc.total_xp
+                }
+                pc_data.append(pc_dict)
+
+            with open(filename, 'w') as f:
+                json.dump(pc_data, f, indent=2)
+
+            log.write(f"PCs saved to {filename}.")
+        except Exception as e:
+            log.write(f"Error saving PCs: {e}")
+            return False
+
+        return True
+
+    def _command_save_mobs(self, filename: str = "mobs.json") -> bool:
+        """Saves the current Mobs to a JSON file."""
+        import json
+        log = self.query_one("#command-output", RichLog)
+
+        try:
+            # Convert Mobs to dictionary format for JSON serialization
+            mob_data = []
+            for mob in self.mobs:
+                mob_dict = {
+                    "name": mob.name,
+                    "max_hp": mob.max_hp,
+                    "hp": mob.hp,
+                    "status": mob.status,
+                    "stunned": mob.stunned,
+                    "morale": mob.morale,
+                    "morale_status": mob.morale_status,
+                    "min_hp": mob.min_hp
+                }
+                mob_data.append(mob_dict)
+
+            with open(filename, 'w') as f:
+                json.dump(mob_data, f, indent=2)
+
+            log.write(f"Mobs saved to {filename}.")
+        except Exception as e:
+            log.write(f"Error saving Mobs: {e}")
+            return False
 
         return True
 
@@ -825,8 +989,8 @@ class MobTrackerApp(App):
                   "- remove/rm <index> (remove entity by index)\n"
                   "- clear/clr [pcs|mobs|all] (clear all entities of specified type)\n"
                   "- reset/r (reset all PC damage statistics for a new combat)\n"
-                  "- save [filename] (save PCs to JSON file, defaults to pcs.json)\n"
-                  "- load [filename] (load PCs from JSON file, defaults to pcs.json)\n"
+                  "- save pcs/mobs [filename] (save entities to JSON file)\n"
+                  "- load pcs/mobs [filename] (load entities from JSON file)\n"
                   "- xp [calculate|show] (calculate XP based on damage or show XP breakdown)\n"
                   "- check/ch <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
@@ -870,8 +1034,8 @@ class MobTrackerApp(App):
                   "- remove/rm <index> (remove entity by index)\n"
                   "- clear/clr [pcs|mobs|all] (clear all entities of specified type)\n"
                   "- reset/r (reset all PC damage statistics for a new combat)\n"
-                  "- save [filename] (save PCs to JSON file, defaults to pcs.json)\n"
-                  "- load [filename] (load PCs from JSON file, defaults to pcs.json)\n"
+                  "- save pcs/mobs [filename] (save entities to JSON file)\n"
+                  "- load pcs/mobs [filename] (load entities from JSON file)\n"
                   "- xp [calculate|show] (calculate XP based on damage or show XP breakdown)\n"
                   "- check/ch <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
