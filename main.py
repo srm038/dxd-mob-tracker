@@ -58,16 +58,24 @@ class MobTrackerApp(App):
         self.commands = {
             "add": self._command_add,
             "damage": self._command_damage,
+            "dmg": self._command_damage,  # Alias for damage
             "check": self._command_check,
+            "ch": self._command_check,  # Alias for check
             "unstun": self._command_unstun,
             "set": self._command_set,
             "combat": self._command_combat,
+            "c": self._command_combat,  # Alias for combat
             "reset": self._command_reset,
+            "r": self._command_reset,  # Alias for reset
             "remove": self._command_remove,
+            "rm": self._command_remove,  # Alias for remove
             "clear": self._command_clear,
+            "clr": self._command_clear,  # Alias for clear
             "xp": self._command_xp,
             "help": self._command_help,
+            "h": self._command_help,  # Alias for help
             "exit": self.exit,
+            "quit": self.exit,  # Alias for exit
         }
         self.command_history = []
         self.history_index = 0
@@ -689,16 +697,24 @@ class MobTrackerApp(App):
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
                   "- combat <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
+                  "- c <attacker_index> <target_index> <damage> (alias for combat)\n"
                   "- damage <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
+                  "- dmg <index> <amount> (alias for damage)\n"
                   "- remove <index> (remove entity by index)\n"
+                  "- rm <index> (alias for remove)\n"
                   "- clear [pcs|mobs|all] (clear all entities of specified type)\n"
+                  "- clr [pcs|mobs|all] (alias for clear)\n"
                   "- reset (reset all PC damage statistics for a new combat)\n"
+                  "- r (alias for reset)\n"
                   "- xp [calculate|show] (calculate XP based on damage or show XP breakdown)\n"
                   "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
+                  "- ch <type> <index> (alias for check)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
                   "- help\n"
-                  "- exit")
+                  "- h (alias for help)\n"
+                  "- exit\n"
+                  "- quit (alias for exit)")
         return False
 
     def exit(self) -> None:
@@ -723,16 +739,24 @@ class MobTrackerApp(App):
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
                   "- combat <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
+                  "- c <attacker_index> <target_index> <damage> (alias for combat)\n"
                   "- damage <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
+                  "- dmg <index> <amount> (alias for damage)\n"
                   "- remove <index> (remove entity by index)\n"
+                  "- rm <index> (alias for remove)\n"
                   "- clear [pcs|mobs|all] (clear all entities of specified type)\n"
+                  "- clr [pcs|mobs|all] (alias for clear)\n"
                   "- reset (reset all PC damage statistics for a new combat)\n"
+                  "- r (alias for reset)\n"
                   "- xp [calculate|show] (calculate XP based on damage or show XP breakdown)\n"
                   "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
+                  "- ch <type> <index> (alias for check)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
                   "- help\n"
-                  "- exit\n\n"
+                  "- h (alias for help)\n"
+                  "- exit\n"
+                  "- quit (alias for exit)\n\n"
                   "Key bindings:\n"
                   "- Ctrl+H: Show help\n"
                   "- Ctrl+Q: Quit application\n"
