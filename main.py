@@ -114,22 +114,22 @@ class MobTrackerApp(App):
 
         pc_lines = []
         for i, pc in enumerate(self.pcs):
-            status_icon = "[✓]" if pc.status == "Alive" else "[X]"
-            stun_indicator = " ⚡" if pc.stunned else ""
+            status_icon = "●" if pc.status == "Alive" else "■"
+            stun_indicator = " ≡" if pc.stunned else ""
 
             # Add morale status indicator
             morale_indicator = ""
             if pc.morale_status == "Panicked":
-                morale_indicator = " 😱"
+                morale_indicator = " ⚠"
             elif pc.morale_status == "Routed":
-                morale_indicator = " 🏃"
+                morale_indicator = " ◊"
 
             # Show morale and min_hp only if they're not the default values for PCs
-            morale_indicator_display = f" [Morale: {pc.morale}]" if pc.morale != 9 else ""
+            morale_indicator_display = f" [M: {pc.morale}]" if pc.morale != 9 else ""
             min_hp_indicator = f" [MinHP: {pc.min_hp}]" if pc.min_hp != -10 else ""
             # Show damage stats if they're not zero
-            damage_dealt_indicator = f" [Dmg+: {pc.damage_dealt}]" if pc.damage_dealt > 0 else ""
-            damage_taken_indicator = f" [Dmg-: {pc.damage_taken}]" if pc.damage_taken > 0 else ""
+            damage_dealt_indicator = f" [D+: {pc.damage_dealt}]" if pc.damage_dealt > 0 else ""
+            damage_taken_indicator = f" [D-: {pc.damage_taken}]" if pc.damage_taken > 0 else ""
             # Show XP if it's not zero
             xp_indicator = f" [XP: {pc.total_xp}]" if pc.total_xp > 0 else ""
 
@@ -144,20 +144,21 @@ class MobTrackerApp(App):
         for i, mob in enumerate(self.mobs):
             # Calculate the actual index for the mob (PCs are 1 to len(pcs), so mobs start at len(pcs)+1)
             mob_actual_index = len(self.pcs) + i + 1
-            status_icon = "[✓]" if mob.status == "Alive" else "[X]"
-            stun_indicator = " ⚡" if mob.stunned else ""
+            status_icon = "●" if mob.status == "Alive" else "■"
+            stun_indicator = " ≡" if mob.stunned else ""
 
             # Add morale status indicator
             morale_indicator = ""
             if mob.morale_status == "Panicked":
-                morale_indicator = " 😱"
+                morale_indicator = " ⚠"
             elif mob.morale_status == "Routed":
-                morale_indicator = " 🏃"
+                morale_indicator = " ◊"
 
-            # Show min_hp if it's not the default value
+            # Show morale and min_hp if they're not the default values for mobs
+            morale_indicator_display = f" [M: {mob.morale}]" if mob.morale != 7 else ""
             min_hp_indicator = f" [MinHP: {mob.min_hp}]" if mob.min_hp != 0 else ""
 
-            mob_lines.append(f"[{mob_actual_index}] {status_icon} {mob.name}{stun_indicator}{morale_indicator} ({mob.hp}/{mob.max_hp} HP) [Morale: {mob.morale}]{min_hp_indicator}")
+            mob_lines.append(f"[{mob_actual_index}] {status_icon} {mob.name}{stun_indicator}{morale_indicator} ({mob.hp}/{mob.max_hp} HP){morale_indicator_display}{min_hp_indicator}")
 
         mob_list.update("\n".join(mob_lines))
 
