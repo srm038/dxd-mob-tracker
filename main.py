@@ -72,6 +72,8 @@ class MobTrackerApp(App):
             "clear": self._command_clear,
             "clr": self._command_clear,  # Alias for clear
             "xp": self._command_xp,
+            "save": self._command_save,
+            "load": self._command_load,
             "help": self._command_help,
             "h": self._command_help,  # Alias for help
             "exit": self.exit,
@@ -601,6 +603,86 @@ class MobTrackerApp(App):
 
         return True
 
+    def _command_save(self, filename: str = "pcs.json") -> bool:
+        """Saves the current PCs to a JSON file."""
+        import json
+        log = self.query_one("#command-output", RichLog)
+
+        try:
+            # Convert PCs to dictionary format for JSON serialization
+            pc_data = []
+            for pc in self.pcs:
+                pc_dict = {
+                    "name": pc.name,
+                    "max_hp": pc.max_hp,
+                    "hp": pc.hp,
+                    "status": pc.status,
+                    "stunned": pc.stunned,
+                    "morale": pc.morale,
+                    "morale_status": pc.morale_status,
+                    "min_hp": pc.min_hp,
+                    "damage_dealt": pc.damage_dealt,
+                    "damage_taken": pc.damage_taken,
+                    "xp_damage_taken": pc.xp_damage_taken,
+                    "xp_damage_dealt": pc.xp_damage_dealt,
+                    "xp_bonus": pc.xp_bonus,
+                    "total_xp": pc.total_xp
+                }
+                pc_data.append(pc_dict)
+
+            with open(filename, 'w') as f:
+                json.dump(pc_data, f, indent=2)
+
+            log.write(f"PCs saved to {filename}.")
+        except Exception as e:
+            log.write(f"Error saving PCs: {e}")
+            return False
+
+        return True
+
+    def _command_load(self, filename: str = "pcs.json") -> bool:
+        """Loads PCs from a JSON file."""
+        import json
+        log = self.query_one("#command-output", RichLog)
+
+        try:
+            with open(filename, 'r') as f:
+                pc_data = json.load(f)
+
+            # Clear current PCs and load new ones
+            self.pcs.clear()
+
+            for pc_dict in pc_data:
+                pc = PC(
+                    name=pc_dict["name"],
+                    max_hp=pc_dict["max_hp"]
+                )
+                # Set other attributes
+                pc.hp = pc_dict["hp"]
+                pc.status = pc_dict["status"]
+                pc.stunned = pc_dict["stunned"]
+                pc.morale = pc_dict["morale"]
+                pc.morale_status = pc_dict["morale_status"]
+                pc.min_hp = pc_dict["min_hp"]
+                pc.damage_dealt = pc_dict["damage_dealt"]
+                pc.damage_taken = pc_dict["damage_taken"]
+                pc.xp_damage_taken = pc_dict["xp_damage_taken"]
+                pc.xp_damage_dealt = pc_dict["xp_damage_dealt"]
+                pc.xp_bonus = pc_dict["xp_bonus"]
+                pc.total_xp = pc_dict["total_xp"]
+
+                self.pcs.append(pc)
+
+            log.write(f"PCs loaded from {filename}.")
+        except FileNotFoundError:
+            log.write(f"Error: File {filename} not found.")
+            return False
+        except Exception as e:
+            log.write(f"Error loading PCs: {e}")
+            return False
+
+        return True
+
     def _command_xp(self, action: str = "") -> bool:
         """Calculates and displays XP for PCs based on combat actions."""
         log = self.query_one("#command-output", RichLog)
@@ -697,25 +779,19 @@ class MobTrackerApp(App):
         log = self.query_one("#command-output", RichLog)
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
-                  "- combat <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
-                  "- c <attacker_index> <target_index> <damage> (alias for combat)\n"
-                  "- damage <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
-                  "- dmg <index> <amount> (alias for damage)\n"
-                  "- remove <index> (remove entity by index)\n"
-                  "- rm <index> (alias for remove)\n"
-                  "- clear [pcs|mobs|all] (clear all entities of specified type)\n"
-                  "- clr [pcs|mobs|all] (alias for clear)\n"
-                  "- reset (reset all PC damage statistics for a new combat)\n"
-                  "- r (alias for reset)\n"
+                  "- combat/c <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
+                  "- damage/dmg <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
+                  "- remove/rm <index> (remove entity by index)\n"
+                  "- clear/clr [pcs|mobs|all] (clear all entities of specified type)\n"
+                  "- reset/r (reset all PC damage statistics for a new combat)\n"
+                  "- save [filename] (save PCs to JSON file, defaults to pcs.json)\n"
+                  "- load [filename] (load PCs from JSON file, defaults to pcs.json)\n"
                   "- xp [calculate|show] (calculate XP based on damage or show XP breakdown)\n"
-                  "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
-                  "- ch <type> <index> (alias for check)\n"
+                  "- check/ch <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
-                  "- help\n"
-                  "- h (alias for help)\n"
-                  "- exit\n"
-                  "- quit (alias for exit)")
+                  "- help/h\n"
+                  "- exit/quit")
         return False
 
     def exit(self) -> None:
@@ -739,25 +815,19 @@ class MobTrackerApp(App):
         log = self.query_one("#command-output", RichLog)
         log.write("\nAvailable commands:\n"
                   "- add <name> <hp or dice notation> [type] [morale] (type can be 'pc' or 'mob', defaults to 'mob')\n"
-                  "- combat <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
-                  "- c <attacker_index> <target_index> <damage> (alias for combat)\n"
-                  "- damage <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
-                  "- dmg <index> <amount> (alias for damage)\n"
-                  "- remove <index> (remove entity by index)\n"
-                  "- rm <index> (alias for remove)\n"
-                  "- clear [pcs|mobs|all] (clear all entities of specified type)\n"
-                  "- clr [pcs|mobs|all] (alias for clear)\n"
-                  "- reset (reset all PC damage statistics for a new combat)\n"
-                  "- r (alias for reset)\n"
+                  "- combat/c <attacker_index> <target_index> <damage> (e.g., combat 1 4 3 for PC 1 hitting mob 4 for 3 damage)\n"
+                  "- damage/dmg <index> <amount> (index 1-N for PCs, N+1-M for mobs)\n"
+                  "- remove/rm <index> (remove entity by index)\n"
+                  "- clear/clr [pcs|mobs|all] (clear all entities of specified type)\n"
+                  "- reset/r (reset all PC damage statistics for a new combat)\n"
+                  "- save [filename] (save PCs to JSON file, defaults to pcs.json)\n"
+                  "- load [filename] (load PCs from JSON file, defaults to pcs.json)\n"
                   "- xp [calculate|show] (calculate XP based on damage or show XP breakdown)\n"
-                  "- check <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
-                  "- ch <type> <index> (alias for check)\n"
+                  "- check/ch <type> <index> (perform morale checks: braveness, boldness, panic, rally, e.g., check braveness 1)\n"
                   "- set <property> <index> <value> (set entity property directly, e.g., set morale 1 5, set stunned 1 true)\n"
                   "- unstun <index>\n"
-                  "- help\n"
-                  "- h (alias for help)\n"
-                  "- exit\n"
-                  "- quit (alias for exit)\n\n"
+                  "- help/h\n"
+                  "- exit/quit\n\n"
                   "Key bindings:\n"
                   "- Ctrl+H: Show help\n"
                   "- Ctrl+Q: Quit application\n"
